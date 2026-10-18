@@ -1,0 +1,313 @@
+{
+  "info": {
+    "_postman_id": "6f1c2d1e-9a7b-4c55-8f0e-2b1d3c4e5f60",
+    "name": "Checkout API",
+    "description": "Cart and payment endpoints of the **checkout** service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "1234567"
+  },
+  "item": [
+    {
+      "name": "Carts",
+      "description": "Everything about carts.",
+      "item": [
+        {
+          "name": "Create cart",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.sendRequest(pm.environment.get('baseUrl') + '/v1/warmup', function () {});",
+                  "pm.variables.set('started', Date.now());"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.environment.set('cartId', pm.response.json().id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" },
+              { "key": "X-Debug", "value": "1", "disabled": true, "description": "Server-side tracing" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{$randomFirstName}} {{$randomLastName}}\",\n  \"email\": \"{{$randomEmail}}\",\n  \"createdAt\": {{$timestamp}},\n  \"at\": \"{{$isoTimestamp}}\",\n  \"lucky\": {{$randomInt}},\n  \"ref\": \"{{$randomUUID}}\",\n  \"due\": \"{{$randomDateFuture}}\",\n  \"city\": \"{{ $randomCity }}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/carts",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "carts"]
+            },
+            "description": "Creates an empty cart."
+          },
+          "response": []
+        },
+        {
+          "name": "Add item",
+          "request": {
+            "method": "post",
+            "header": [{ "key": "If-Match", "value": "{{cartEtag}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"sku\": \"{{sku}}\", \"quantity\": {{qty}} }",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/carts/:cartId/items?expand=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "carts", ":cartId", "items"],
+              "query": [
+                { "key": "expand", "value": "true" },
+                { "key": "debug", "value": "1", "disabled": true }
+              ],
+              "variable": [{ "key": "cartId", "value": "{{cartId}}" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin",
+          "auth": {
+            "type": "basic",
+            "basic": [
+              { "key": "password", "value": "s3cret", "type": "string" },
+              { "key": "username", "value": "admin", "type": "string" }
+            ]
+          },
+          "item": [
+            {
+              "name": "Purge carts",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/carts?olderThan=30d",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v1", "carts"],
+                  "query": [{ "key": "olderThan", "value": "30d" }]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Cart report",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/admin/report",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v1", "admin", "report"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Uploads",
+      "auth": {
+        "type": "apikey",
+        "apikey": [
+          { "key": "in", "value": "query", "type": "string" },
+          { "key": "value", "value": "{{apiKey}}", "type": "string" },
+          { "key": "key", "value": "api_key", "type": "string" }
+        ]
+      },
+      "item": [
+        {
+          "name": "Upload avatar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "caption", "value": "Me at {{$randomCity}}", "type": "text" },
+                { "key": "avatar", "type": "file", "src": "/Users/me/Pictures/avatar.png" },
+                { "key": "meta", "value": "{\"v\":1}", "type": "text", "contentType": "application/json" },
+                { "key": "draft", "value": "true", "type": "text", "disabled": true }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/uploads/avatar",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "uploads", "avatar"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload raw",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/octet-stream" }],
+            "body": { "mode": "file", "file": { "src": "C:\\data\\export.bin" } },
+            "url": {
+              "raw": "{{baseUrl}}/v1/uploads/raw",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "uploads", "raw"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login form",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "{{user}}", "type": "string" },
+                { "key": "password", "value": "{{pass}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "password", "type": "text" },
+                { "key": "scope", "value": "carts payments", "type": "text" },
+                { "key": "debug", "value": "true", "type": "text", "disabled": true }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/oauth/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["oauth", "token"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Search products",
+      "protocolProfileBehavior": { "disableBodyPruning": true },
+      "request": {
+        "auth": {
+          "type": "oauth2",
+          "oauth2": [{ "key": "accessTokenUrl", "value": "https://auth.example.com/token", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "graphql",
+          "graphql": {
+            "query": "query Search($q: String!) {\n  products(q: $q) { id name }\n}",
+            "variables": "{\n  \"q\": \"{{term}}\"\n}"
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/graphql",
+          "host": ["{{baseUrl}}"],
+          "path": ["graphql"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Order as XML",
+      "request": {
+        "auth": {
+          "type": "apikey",
+          "apikey": [
+            { "key": "key", "value": "X-Api-Key", "type": "string" },
+            { "key": "value", "value": "{{apiKey}}", "type": "string" }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "<order><sku>{{sku}}</sku></order>",
+          "options": { "raw": { "language": "xml" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/orders",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "orders"]
+        },
+        "description": { "content": "Legacy XML endpoint.", "type": "text/markdown" }
+      },
+      "response": []
+    },
+    {
+      "name": "Note",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "Hello {{user name}}, mood: {{$randomBs}}",
+          "options": { "raw": { "language": "text" } }
+        },
+        "url": {
+          "raw": "localhost:3000/notes",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["notes"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Health",
+      "request": "https://status.example.com/health"
+    },
+    {
+      "name": "Trace",
+      "request": {
+        "method": "TRACE",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/" }
+      },
+      "response": []
+    },
+    {
+      "name": "Placeholder"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": ["pm.request.headers.upsert({ key: 'X-Request-Start', value: String(Date.now()) });"]
+      }
+    },
+    {
+      "listen": "test",
+      "script": { "type": "text/javascript", "exec": [""] }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "https://api.example.com" },
+    { "key": "api.version", "value": "v1" },
+    { "key": "user name", "value": "Ada" },
+    { "key": "legacy", "value": "x", "disabled": true }
+  ]
+}

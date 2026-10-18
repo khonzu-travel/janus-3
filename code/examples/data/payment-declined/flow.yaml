@@ -1,0 +1,7 @@
+# A child of default: payments are declined, and the request must name this
+# scenario's order in euros.
+description: The card is declined for order ord-7.
+ids:
+  orderId: ord-7
+overrides:
+  - /v1/payments/POST

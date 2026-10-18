@@ -1,0 +1,7 @@
+# The page a request asks for chooses the response; pages hold no state.
+by: query.page
+whenAbsent: "1"
+pages:
+  "1": 200
+  "2": 200.page-2
+otherwise: 200.empty

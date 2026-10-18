@@ -1,0 +1,16 @@
+info:
+  name: Carts
+  type: folder
+  seq: 1
+request:
+  headers:
+    - name: Accept
+      value: application/json
+  auth:
+    type: apikey
+    key: X-Api-Key
+    value: '{{process.env.API_KEY}}'
+    placement: header
+  variables:
+    - name: currency
+      value: EUR

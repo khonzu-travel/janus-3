@@ -1,0 +1,37 @@
+{
+  "name": "@janus/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Janus as a desktop application",
+  "type": "module",
+  "main": "dist/main/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && vite build --config vite.preload.config.ts && vite build",
+    "start": "pnpm --dir ../.. run build && electron .",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/pages/tsconfig.json",
+    "package": "node scripts/package.ts",
+    "test:electron": "node scripts/with-display.ts playwright test --config playwright.config.ts",
+    "smoke": "node scripts/with-display.ts node scripts/smoke.ts",
+    "test:desktop": "pnpm run test:electron && node scripts/package.ts --dir && pnpm run smoke"
+  },
+  "dependencies": {
+    "@janus/server": "workspace:*"
+  },
+  "devDependencies": {
+    "@electron/fuses": "2.1.3",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@janus/ui": "workspace:*",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "vite": "^8.3.1"
+  }
+}

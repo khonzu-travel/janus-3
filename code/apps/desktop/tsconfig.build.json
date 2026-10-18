@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "noEmit": false,
+    "declaration": false,
+    "declarationMap": false,
+    "customConditions": []
+  },
+  // The preload and the pages are bundled by Vite.
+  "include": ["src/main/**/*", "src/server-host/**/*", "src/shared/**/*"],
+  "exclude": ["src/**/*.test.ts"]
+}

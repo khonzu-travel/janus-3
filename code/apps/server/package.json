@@ -1,0 +1,32 @@
+{
+  "name": "@janus/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "@janus/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "janus": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "schema"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@janus/adapter-http": "workspace:*",
+    "@janus/core": "workspace:*",
+    "@janus/fixtures-fs": "workspace:*",
+    "@janus/runner": "workspace:*",
+    "@janus/ui": "workspace:*",
+    "undici": "^8.11.2"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "page": 1,
+  "items": [{ "id": "ord-1" }, { "id": "ord-2" }],
+  "next": "/v1/orders?page=2"
+}

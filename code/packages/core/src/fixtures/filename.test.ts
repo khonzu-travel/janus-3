@@ -1,0 +1,163 @@
+import { describe, expect, it } from 'vitest';
+
+import { parseFileName } from './filename.js';
+
+describe('parseFileName', () => {
+  it.each([
+    [
+      '200_{application-json}.json',
+      { kind: 'response', status: 200, mediaType: 'application/json', extension: 'json' },
+    ],
+    ['200_{text-plain}.txt', { kind: 'response', status: 200, mediaType: 'text/plain', extension: 'txt' }],
+    [
+      '201_{application-octet-stream}.bin',
+      { kind: 'response', status: 201, mediaType: 'application/octet-stream', extension: 'bin' },
+    ],
+    [
+      '200_{application-vnd.api+json}.JSON',
+      { kind: 'response', status: 200, mediaType: 'application/vnd.api+json', extension: 'json' },
+    ],
+    ['404_{application-problem+json}.json', { kind: 'response', status: 404, mediaType: 'application/problem+json' }],
+    ['599_{text-plain}.txt', { kind: 'response', status: 599 }],
+    [
+      '200_[en-US]_{application-json}.json',
+      { kind: 'response', status: 200, mediaType: 'application/json', extension: 'json', locale: 'en-US' },
+    ],
+    ['200_[fr]_{text-plain}.txt', { kind: 'response', status: 200, mediaType: 'text/plain', locale: 'fr' }],
+    ['404_[zh-Hant-TW]_{text-html}.html', { kind: 'response', status: 404, locale: 'zh-Hant-TW' }],
+    ['200_[de-ch]_{text-plain}.txt', { kind: 'response', locale: 'de-ch' }],
+    ['200_{application-json}.json', { kind: 'response', locale: null }],
+    ['200.json', { kind: 'response', status: 200, mediaType: 'application/json', extension: 'json', locale: null }],
+    ['201.JSON', { kind: 'response', status: 201, mediaType: 'application/json', extension: 'json' }],
+    ['200.txt', { kind: 'response', mediaType: 'text/plain', extension: 'txt' }],
+    ['200.html', { kind: 'response', mediaType: 'text/html' }],
+    ['200.css', { kind: 'response', mediaType: 'text/css' }],
+    ['200.js', { kind: 'response', mediaType: 'text/javascript' }],
+    ['200.csv', { kind: 'response', mediaType: 'text/csv' }],
+    ['200.md', { kind: 'response', mediaType: 'text/markdown' }],
+    ['200.xml', { kind: 'response', mediaType: 'application/xml' }],
+    ['200.yaml', { kind: 'response', mediaType: 'application/yaml', extension: 'yaml' }],
+    ['200.yml', { kind: 'response', mediaType: 'application/yaml', extension: 'yml' }],
+    ['200.pdf', { kind: 'response', mediaType: 'application/pdf' }],
+    ['200.png', { kind: 'response', mediaType: 'image/png' }],
+    ['200.jpg', { kind: 'response', mediaType: 'image/jpeg' }],
+    ['200.jpeg', { kind: 'response', mediaType: 'image/jpeg' }],
+    ['200.gif', { kind: 'response', mediaType: 'image/gif' }],
+    ['200.webp', { kind: 'response', mediaType: 'image/webp' }],
+    ['200.svg', { kind: 'response', mediaType: 'image/svg+xml' }],
+    ['201.bin', { kind: 'response', mediaType: 'application/octet-stream', extension: 'bin' }],
+    [
+      '200_[en-US].json',
+      { kind: 'response', status: 200, mediaType: 'application/json', extension: 'json', locale: 'en-US' },
+    ],
+    ['404_[fr].html', { kind: 'response', status: 404, mediaType: 'text/html', locale: 'fr' }],
+    ['204', { kind: 'response', status: 204, mediaType: null, extension: null, locale: null }],
+    ['205', { kind: 'response', status: 205, mediaType: null, extension: null }],
+    ['304', { kind: 'response', status: 304, mediaType: null, extension: null }],
+    ['200.headers.json', { kind: 'headers', status: 200 }],
+    ['204.headers.json', { kind: 'headers', status: 204 }],
+    ['200.json', { kind: 'response', variant: null }],
+    ['200.empty.json', { kind: 'response', status: 200, mediaType: 'application/json', variant: 'empty' }],
+    ['200.v2.json', { kind: 'response', status: 200, variant: 'v2' }],
+    ['200.page-2.json', { kind: 'response', status: 200, variant: 'page-2' }],
+    ['200_[fr].empty.json', { kind: 'response', status: 200, locale: 'fr', variant: 'empty' }],
+    [
+      '422_{application-problem+json}.declined.json',
+      { kind: 'response', status: 422, mediaType: 'application/problem+json', extension: 'json', variant: 'declined' },
+    ],
+    [
+      '200_[en]_{text-plain}.short.txt',
+      { kind: 'response', status: 200, mediaType: 'text/plain', locale: 'en', variant: 'short' },
+    ],
+    ['200_{application-json}.en.json', { kind: 'response', variant: 'en' }],
+    ['304.fresh', { kind: 'response', status: 304, mediaType: null, extension: null, variant: 'fresh' }],
+    ['204.done', { kind: 'response', status: 204, variant: 'done' }],
+    ['304.fresh.headers.json', { kind: 'headers', status: 304, variant: 'fresh' }],
+    ['200.empty.headers.json', { kind: 'headers', status: 200, variant: 'empty' }],
+    ['200.headers.json', { kind: 'headers', status: 200, variant: null }],
+    [`200.${'a'.repeat(32)}.json`, { kind: 'response', variant: 'a'.repeat(32) }],
+  ])('accepts %s', (name, expected) => {
+    expect(parseFileName(name)).toMatchObject(expected);
+  });
+
+  it('keeps the explicit media type authoritative regardless of the extension', () => {
+    expect(parseFileName('200_{text-plain}.json')).toEqual({
+      kind: 'response',
+      status: 200,
+      mediaType: 'text/plain',
+      extension: 'json',
+      locale: null,
+      variant: null,
+    });
+    expect(parseFileName('200_{application-msword}.docx')).toEqual({
+      kind: 'response',
+      status: 200,
+      mediaType: 'application/msword',
+      extension: 'docx',
+      locale: null,
+      variant: null,
+    });
+  });
+
+  it.each([
+    ['200', 'invalid-filename', 'carries a body'],
+    ['200.docx', 'invalid-filename', 'write it in the name, e.g. 200_{application-octet-stream}.docx'],
+    ['200_[fr].foo', 'invalid-filename', 'does not name a media type'],
+    ['200.Empty.json', 'invalid-filename', 'not a variant name'],
+    ['200.json.json', 'invalid-filename', 'not a variant name'],
+    ['200.headers.txt', 'invalid-filename', 'not a variant name'],
+    ['200.meta.json', 'invalid-filename', 'not a variant name'],
+    ['200.a.b.json', 'invalid-filename', 'unrecognised'],
+    [`200.${'a'.repeat(33)}.json`, 'invalid-filename', 'not a variant name'],
+    ['200.-x.json', 'invalid-filename', 'not a variant name'],
+    ['304.json', 'invalid-bodyless', 'name the file exactly "304"'],
+    ['304.Fresh', 'invalid-filename', 'not a variant name'],
+    ['304.fresh.json', 'invalid-bodyless', 'name the file exactly "304"'],
+    ['200.empty', 'invalid-filename', 'does not name a media type'],
+    ['200.json.headers.json', 'invalid-filename', 'not a variant name'],
+    ['200_[fr].empty.headers.json', 'invalid-filename', 'per-locale header sidecars are not supported'],
+    ['200.', 'invalid-filename', 'unrecognised'],
+    ['200_[e].json', 'invalid-filename', 'not a language tag'],
+    ['600.json', 'invalid-filename', 'outside 100–599'],
+    ['204.json', 'invalid-bodyless', 'name the file exactly "204"'],
+    ['204_[fr].json', 'invalid-bodyless', 'name the file exactly "204"'],
+    ['200_{application-json}', 'invalid-filename', 'missing file extension'],
+    ['200_{application-json}.Empty.json', 'invalid-filename', 'not a variant name'],
+    ['200_{application-json}~v2.json', 'invalid-filename', 'unsupported suffix'],
+    ['200_{application-json}.a.b.json', 'invalid-filename', 'unsupported suffix'],
+    ['200_[]_{application-json}.json', 'invalid-filename', 'not a language tag'],
+    ['200_[e]_{application-json}.json', 'invalid-filename', 'not a language tag'],
+    ['200_[en_US]_{application-json}.json', 'invalid-filename', 'not a language tag'],
+    ['200_[en-]_{application-json}.json', 'invalid-filename', 'not a language tag'],
+    ['200_[*]_{application-json}.json', 'invalid-filename', 'not a language tag'],
+    ['200_[en-US]_{json}.json', 'invalid-filename', 'not a media type'],
+    ['200_[en-US]', 'invalid-filename', 'needs an extension or a media type after the locale'],
+    ['200_{application-json}_[en-US].json', 'invalid-filename', 'unsupported suffix'],
+    ['200_[en-US]{application-json}.json', 'invalid-filename', 'needs an extension or a media type after the locale'],
+    ['204_[en-US]', 'invalid-bodyless', 'cannot have a locale'],
+    ['204_[en-US]_{application-json}.json', 'invalid-bodyless', 'name the file exactly "204"'],
+    ['200_[en-US].headers.json', 'invalid-filename', 'per-locale header sidecars are not supported'],
+    ['200_{json}.json', 'invalid-filename', 'not a media type'],
+    ['200_{-json}.json', 'invalid-filename', 'not a media type'],
+    ['200_{application-}.json', 'invalid-filename', 'not a media type'],
+    ['200_{application json}.json', 'invalid-filename', 'not a media type'],
+    ['200_{application-json;charset=utf-8}.json', 'invalid-filename', 'not a media type'],
+    ['200_{*-*}.txt', 'invalid-filename', 'cannot be a wildcard'],
+    ['200_{text-*}.txt', 'invalid-filename', 'cannot be a wildcard'],
+    ['200_{*-plain}.txt', 'invalid-filename', 'cannot be a wildcard'],
+    ['099_{text-plain}.txt', 'invalid-filename', 'outside 100–599'],
+    ['600_{text-plain}.txt', 'invalid-filename', 'outside 100–599'],
+    ['101_{text-plain}.txt', 'invalid-filename', 'informational'],
+    ['20_{text-plain}.txt', 'invalid-filename', 'unrecognised'],
+    ['2000_{text-plain}.txt', 'invalid-filename', 'unrecognised'],
+    ['ok.json', 'invalid-filename', 'unrecognised'],
+    ['README.md', 'invalid-filename', 'unrecognised'],
+    ['204_{application-json}.json', 'invalid-bodyless', 'name the file exactly "204"'],
+    ['304.txt', 'invalid-bodyless', 'name the file exactly "304"'],
+    ['700.headers.json', 'invalid-filename', 'outside 100–599'],
+  ])('rejects %s', (name, code, message) => {
+    const parsed = parseFileName(name);
+    expect(parsed).toMatchObject({ kind: 'invalid', code });
+    if (parsed.kind === 'invalid') expect(parsed.message).toContain(message);
+  });
+});

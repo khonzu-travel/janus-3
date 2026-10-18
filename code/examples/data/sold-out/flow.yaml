@@ -1,0 +1,7 @@
+# A child of default: the product list is empty, everything else is inherited.
+description: Every product is sold out, so the product list is empty.
+ids:
+  storeId: store_main
+  cartId: cart_sold_out
+overrides:
+  - /v1/products/GET

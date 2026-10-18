@@ -1,0 +1,2 @@
+# POST /v1/products refuses bodies that are not JSON with 415.
+accepts: [application/json]

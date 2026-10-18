@@ -1,0 +1,10 @@
+name: Local
+variables:
+  - name: baseUrl
+    value: http://localhost:8080
+  - name: token
+    value: ''
+    secret: true
+  - name: legacyUrl
+    value: http://localhost:9090
+    disabled: true

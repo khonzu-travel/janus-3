@@ -1,0 +1,236 @@
+# format: bruno-yaml
+# collection: shop-api-yaml (Shop API (YAML))
+
+--- folder.yaml (folder)
+name: Shop API (YAML)
+vars:
+  apiVersion: v2
+headers:
+  - name: X-Client
+    value: janus-import
+  - name: Authorization
+    value: Bearer {{token}}
+scripts:
+  before: req.setHeader("X-Request-Start", String(Date.now()));
+docs: |-
+  # Shop API
+
+  Imported from Bruno YAML.
+
+--- 010-carts/folder.yaml (folder)
+name: Carts
+vars:
+  currency: EUR
+headers:
+  - name: Accept
+    value: application/json
+  - name: Authorization
+    value: ""
+    disabled: true
+  - name: X-Api-Key
+    value: "{{API_KEY}}"
+
+--- 010-carts/010-create-cart.request.yaml (request)
+name: Create cart
+method: POST
+url: "{{baseUrl}}/v1/carts"
+headers:
+  - name: Idempotency-Key
+    value: "{{$uuid}}"
+  - name: X-Debug
+    value: "1"
+    disabled: true
+body:
+  type: json
+  text: |-
+    {
+      "currency": "{{currency}}",
+      "quantity": {{qty}}
+    }
+vars:
+  qty: "2"
+extract:
+  cartId: "{{$response.body.$.id}}"
+scripts:
+  after: |-
+    bru.setVar("cartEtag", res.headers.etag);
+
+    console.log(res.body.id);
+
+    test("res.status: eq 201", function () {
+      expect(res.status).to.equal(201);
+    });
+    test("res.body.items: isArray", function () {
+      expect(res.body.items).to.be.an('array');
+    });
+
+    test("has an id", function () {
+      expect(res.body.id).to.be.a("string");
+    });
+docs: Creates a cart.
+source:
+  format: bruno-yaml
+  file: carts/create-cart.yml
+  item: carts/create-cart.yml
+
+--- 010-carts/020-get-cart.request.yaml (request)
+name: Get cart
+method: GET
+url: "{{baseUrl}}/v1/carts/:cartId?expand=items"
+pathParams:
+  cartId: "{{cartId}}"
+headers:
+  - name: X-Api-Key
+    value: ""
+    disabled: true
+source:
+  format: bruno-yaml
+  file: carts/get-cart.yml
+  item: carts/get-cart.yml
+
+--- 020-upload.request.yaml (request)
+name: Upload
+method: POST
+url: "{{baseUrl}}/v1/uploads"
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+  - name: Authorization
+    value: Basic dXBsb2FkZXI6aHVudGVyMg==
+body:
+  type: multipart
+  parts:
+    - name: caption
+      value: Holiday
+    - name: avatar
+      file: avatar.png
+source:
+  format: bruno-yaml
+  file: upload.yml
+  item: upload.yml
+
+--- 030-login.request.yaml (request)
+name: Login
+method: POST
+url: "{{baseUrl}}/oauth/token?key={{apiKey}}"
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+body:
+  type: form
+  fields:
+    - name: grant_type
+      value: client_credentials
+    - name: debug
+      value: "1"
+      disabled: true
+source:
+  format: bruno-yaml
+  file: login.yml
+  item: login.yml
+
+--- 040-search.request.yaml (request)
+name: Search
+method: POST
+url: "{{baseUrl}}/graphql"
+body:
+  type: graphql
+  query: query { products { id } }
+  variables: '{ "limit": 5 }'
+source:
+  format: bruno-yaml
+  file: search.yml
+  item: search.yml
+
+--- 050-order.request.yaml (request)
+name: Order
+method: POST
+url: "{{baseUrl}}/v1/orders"
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+body:
+  type: xml
+  text: <order><sku>{{sku}}</sku></order>
+source:
+  format: bruno-yaml
+  file: order.yml
+  item: order.yml
+
+--- environments/local.yaml (environment)
+name: Local
+vars:
+  baseUrl: http://localhost:8080
+
+--- environments/local.local.yaml (environment)
+vars:
+  token: ""
+
+--- report
+- file: opencollection.yml
+  location: opencollection.yml
+  name: Shop API (YAML)
+  outcome: converted
+  notes: []
+- file: carts/folder.yml
+  location: carts/folder.yml
+  name: Carts
+  outcome: converted-with-notes
+  notes:
+    - "{{process.env.API_KEY}} became {{API_KEY}}; define API_KEY in an environment"
+  id: 010-carts
+- file: carts/create-cart.yml
+  location: carts/create-cart.yml
+  name: Create cart
+  outcome: converted
+  notes: []
+  id: 010-carts/010-create-cart
+- file: carts/get-cart.yml
+  location: carts/get-cart.yml
+  name: Get cart
+  outcome: converted-with-notes
+  notes:
+    - the disabled query parameter debug was dropped; Janus keeps the query in the URL
+  id: 010-carts/020-get-cart
+- file: upload.yml
+  location: upload.yml
+  name: Upload
+  outcome: converted-with-notes
+  notes:
+    - the file part "avatar" refers to images/avatar.png, which is not in the export; copy it beside the request as avatar.png
+  id: 020-upload
+- file: login.yml
+  location: login.yml
+  name: Login
+  outcome: converted
+  notes: []
+  id: 030-login
+- file: search.yml
+  location: search.yml
+  name: Search
+  outcome: converted
+  notes: []
+  id: 040-search
+- file: order.yml
+  location: order.yml
+  name: Order
+  outcome: converted-with-notes
+  notes:
+    - auth type "oauth2" was not converted; add its header or script by hand
+  id: 050-order
+- file: watch.yml
+  location: watch.yml
+  name: Watch
+  outcome: skipped
+  notes:
+    - grpc requests are not HTTP requests and are not imported
+- file: environments/local.yml
+  location: environments/local.yml
+  name: Local
+  outcome: converted-with-notes
+  notes:
+    - the secret token was written to the .local.yaml file with an empty value; fill it in
+    - the disabled variable legacyUrl was dropped

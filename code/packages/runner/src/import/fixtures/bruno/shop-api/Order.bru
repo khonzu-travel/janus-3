@@ -1,0 +1,20 @@
+meta {
+  name: Order
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/v1/orders
+  body: xml
+  auth: digest
+}
+
+auth:digest {
+  username: a
+  password: b
+}
+
+body:xml {
+  <order><sku>{{sku}}</sku></order>
+}

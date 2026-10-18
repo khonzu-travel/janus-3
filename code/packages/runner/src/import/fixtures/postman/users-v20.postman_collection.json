@@ -1,0 +1,83 @@
+{
+  "variables": [],
+  "info": {
+    "name": "Users (v2.0)",
+    "_postman_id": "3b9e3c1a-0c3e-4b0f-a3f6-2e7e1a8c9d10",
+    "description": "",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+  },
+  "auth": {
+    "type": "basic",
+    "basic": { "username": "svc", "password": "pw", "saveHelperData": true, "showPassword": false }
+  },
+  "item": [
+    {
+      "name": "List users",
+      "request": {
+        "url": "https://api.example.com/users?page=1",
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json", "description": "" }],
+        "body": {},
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "Get user",
+      "request": {
+        "url": {
+          "protocol": "https",
+          "host": "api.example.com",
+          "path": "users/:id",
+          "query": [{ "key": "fields", "value": "name,email" }],
+          "variable": [{ "id": "id", "value": "42", "type": "string" }]
+        },
+        "method": "GET",
+        "header": "Accept: application/json\nX-Trace: {{$randomUUID}}",
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "Create user",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": "tests['created'] = responseCode.code === 201;\npostman.setNextRequest('Get user');"
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "bearer", "bearer": { "token": "{{token}}" } },
+        "url": "{{host}}/users",
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json", "description": "" }],
+        "body": { "mode": "raw", "raw": "{\"name\":\"{{$randomFullName}}\"}" },
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "Key in query",
+      "request": {
+        "auth": { "type": "apikey", "apikey": { "key": "key", "value": "{{apiKey}}", "in": "query" } },
+        "url": "https://api.example.com/users/search?q=ada#top",
+        "method": "GET",
+        "header": [],
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "Digest",
+      "request": {
+        "auth": { "type": "digest", "digest": { "username": "a", "password": "b" } },
+        "url": "https://api.example.com/digest",
+        "method": "GET"
+      },
+      "response": []
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+meta {
+  name: Get cart
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/carts/:cartId?expand=items
+  body: none
+  auth: inherit
+}
+
+params:query {
+  expand: items
+  ~debug: true
+}
+
+params:path {
+  cartId: {{cartId}}
+}

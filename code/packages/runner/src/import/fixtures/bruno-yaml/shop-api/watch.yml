@@ -1,0 +1,7 @@
+info:
+  name: Watch
+  type: grpc
+  seq: 6
+grpc:
+  url: '{{grpcHost}}'
+  method: /shop.Carts/Watch

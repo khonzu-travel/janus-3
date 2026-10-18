@@ -1,0 +1,529 @@
+# format: bruno
+# collection: shop-api (Shop API)
+
+--- folder.yaml (folder)
+name: Shop API
+vars:
+  apiVersion: v2
+headers:
+  - name: X-Client
+    value: janus-import
+  - name: X-Experimental
+    value: on
+    disabled: true
+  - name: Authorization
+    value: Bearer {{token}}
+scripts:
+  before: req.setHeader("X-Request-Start", String(Date.now()));
+  after: |-
+    bru.setVar("lastStatus", res.status);
+
+    test("responds quickly", function () {
+      expect(res.responseTime).to.be.below(2000);
+    });
+docs: |-
+  # Shop API
+
+  Imported from Bruno.
+
+--- 010-carts/folder.yaml (folder)
+name: Carts
+vars:
+  currency: EUR
+headers:
+  - name: Accept
+    value: application/json
+  - name: Authorization
+    value: ""
+    disabled: true
+  - name: X-Api-Key
+    value: "{{API_KEY}}"
+scripts:
+  after: console.log("cart call done");
+
+--- 010-carts/010-archive/folder.yaml (folder)
+name: Archive
+headers:
+  - name: X-Api-Key
+    value: ""
+    disabled: true
+  - name: Authorization
+    value: Basic {{basicAuth}}
+
+--- 010-carts/010-archive/010-list-archived.request.yaml (request)
+name: List archived
+method: GET
+url: "{{baseUrl}}/v1/archive/carts"
+source:
+  format: bruno
+  file: Carts/Archive/List archived.bru
+  item: Carts/Archive/List archived.bru
+
+--- 010-carts/020-create-cart.request.yaml (request)
+name: Create cart
+method: POST
+url: "{{baseUrl}}/v1/carts"
+headers:
+  - name: Idempotency-Key
+    value: "{{$uuid}}"
+  - name: X-Debug
+    value: "1"
+    disabled: true
+body:
+  type: json
+  text: |-
+    {
+      "currency": "{{currency}}",
+      "customer": "{{$faker.person.fullName}}",
+      "quantity": {{qty}}
+    }
+vars:
+  qty: "2"
+extract:
+  cartId: "{{$response.body.$.id}}"
+  firstSku: "{{$response.body.$.items[0].sku}}"
+scripts:
+  before: bru.setVar("startedAt", Date.now());
+  after: |-
+    bru.setVar("cartEtag", res.headers.etag);
+    bru.setVar("itemCount", res.body.items.filter(i => i.qty > 0).length);
+
+    bru.setNextRequest("Get cart");
+
+    test("res.status: eq 201", function () {
+      expect(res.status).to.equal(201);
+    });
+    test("res.body.id: isString", function () {
+      expect(res.body.id).to.be.a('string');
+    });
+
+    test("has an id", function () {
+      expect(res.body.id).to.be.a("string");
+    });
+docs: Creates a cart for the current customer.
+source:
+  format: bruno
+  file: Carts/Create cart.bru
+  item: Carts/Create cart.bru
+
+--- 010-carts/030-get-cart.request.yaml (request)
+name: Get cart
+method: GET
+url: "{{baseUrl}}/v1/carts/:cartId?expand=items"
+pathParams:
+  cartId: "{{cartId}}"
+source:
+  format: bruno
+  file: Carts/Get cart.bru
+  item: Carts/Get cart.bru
+
+--- 010-carts/040-remove-item.request.yaml (request)
+name: Remove item
+method: DELETE
+url: "{{baseUrl}}/v1/carts/:cartId/items/:sku"
+pathParams:
+  cartId: "{{cartId}}"
+  sku: "{{sku}}"
+headers:
+  - name: X-Api-Key
+    value: ""
+    disabled: true
+source:
+  format: bruno
+  file: Carts/Remove item.bru
+  item: Carts/Remove item.bru
+
+--- 020-uploads/folder.yaml (folder)
+name: Uploads
+
+--- 020-uploads/010-avatar.request.yaml (request)
+name: Avatar
+method: POST
+url: "{{baseUrl}}/v1/uploads/avatar"
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+  - name: Authorization
+    value: Basic dXBsb2FkZXI6aHVudGVyMg==
+body:
+  type: multipart
+  parts:
+    - name: caption
+      value: Holiday
+    - name: avatar
+      file: avatar.png
+    - name: draft
+      value: "true"
+      disabled: true
+source:
+  format: bruno
+  file: Uploads/Avatar.bru
+  item: Uploads/Avatar.bru
+
+--- 020-uploads/020-form.request.yaml (request)
+name: Form
+method: POST
+url: "{{baseUrl}}/v1/forms"
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+body:
+  type: form
+  fields:
+    - name: name
+      value: "{{$faker.person.firstName}}"
+    - name: debug
+      value: "1"
+      disabled: true
+source:
+  format: bruno
+  file: Uploads/Form.bru
+  item: Uploads/Form.bru
+
+--- 020-uploads/030-raw.request.yaml (request)
+name: Raw
+method: PUT
+url: "{{baseUrl}}/v1/uploads/raw"
+body:
+  type: file
+  file: export.bin
+  contentType: application/octet-stream
+source:
+  format: bruno
+  file: Uploads/Raw.bru
+  item: Uploads/Raw.bru
+
+--- 030-search.request.yaml (request)
+name: Search
+method: POST
+url: "{{baseUrl}}/graphql?api_key={{apiKey}}"
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+body:
+  type: graphql
+  query: |-
+    query Search($q: String!) {
+      products(q: $q) { id }
+    }
+  variables: |-
+    {
+      "q": "{{term}}"
+    }
+source:
+  format: bruno
+  file: Search.bru
+  item: Search.bru
+
+--- 040-notes.request.yaml (request)
+name: Notes
+method: POST
+url: "{{baseUrl}}/v1/notes"
+body:
+  type: text
+  text: Hello from {{user_name}}
+source:
+  format: bruno
+  file: Notes.bru
+  item: Notes.bru
+
+--- 050-order.request.yaml (request)
+name: Order
+method: POST
+url: "{{baseUrl}}/v1/orders"
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+body:
+  type: xml
+  text: <order><sku>{{sku}}</sku></order>
+source:
+  format: bruno
+  file: Order.bru
+  item: Order.bru
+
+--- 060-query.request.yaml (request)
+name: Query
+method: POST
+url: "{{baseUrl}}/sparql"
+body:
+  type: text
+  text: SELECT ?s WHERE { ?s ?p ?o } LIMIT 1
+source:
+  format: bruno
+  file: Query.bru
+  item: Query.bru
+
+--- 070-assertions.request.yaml (request)
+name: Assertions
+method: GET
+url: "{{baseUrl}}/v1/stats"
+scripts:
+  after: |-
+    test("res.status: eq 200", function () {
+      expect(res.status).to.equal(200);
+    });
+    test("res.body.mode: neq \"maintenance\"", function () {
+      expect(res.body.mode).to.not.equal("maintenance");
+    });
+    test("res.body.count: gt 0", function () {
+      expect(res.body.count).to.be.greaterThan(0);
+    });
+    test("res.body.total: gte 1", function () {
+      expect(res.body.total).to.be.at.least(1);
+    });
+    test("res.body.errors: lt 1", function () {
+      expect(res.body.errors).to.be.lessThan(1);
+    });
+    test("res.body.warnings: lte 5", function () {
+      expect(res.body.warnings).to.be.at.most(5);
+    });
+    test("res.body.region: in eu,us", function () {
+      expect(res.body.region).to.be.oneOf(["eu", "us"]);
+    });
+    test("res.body.tier: notIn \"free\",\"trial\"", function () {
+      expect(res.body.tier).to.not.be.oneOf(["free", "trial"]);
+    });
+    test("res.body.name: contains shop", function () {
+      expect(res.body.name).to.include("shop");
+    });
+    test("res.body.notes: notContains secret", function () {
+      expect(res.body.notes).to.not.include("secret");
+    });
+    test("res.body.items: length 3", function () {
+      expect(res.body.items).to.have.lengthOf(3);
+    });
+    test("res.body.sku: matches ^SKU-\\d+$", function () {
+      expect(res.body.sku).to.match(new RegExp("^SKU-\\d+$"));
+    });
+    test("res.body.code: notMatches ^ERR", function () {
+      expect(res.body.code).to.not.match(new RegExp("^ERR"));
+    });
+    test("res.body.url: startsWith \"https://\"", function () {
+      expect(res.body.url).to.be.a('string').and.satisfy((v) => v.startsWith("https://"));
+    });
+    test("res.body.file: endsWith .json", function () {
+      expect(res.body.file).to.be.a('string').and.satisfy((v) => v.endsWith(".json"));
+    });
+    test("res.body.score: between 1,10", function () {
+      expect(res.body.score).to.be.within(1, 10);
+    });
+    test("res.body.empty: isEmpty", function () {
+      expect(res.body.empty).to.be.empty;
+    });
+    test("res.body.list: isNotEmpty", function () {
+      expect(res.body.list).to.not.be.empty;
+    });
+    test("res.body.deleted: isNull", function () {
+      expect(res.body.deleted).to.be.null;
+    });
+    test("res.body.missing: isUndefined", function () {
+      expect(res.body.missing).to.be.undefined;
+    });
+    test("res.body.present: isDefined", function () {
+      expect(res.body.present).to.not.be.undefined;
+    });
+    test("res.body.active: isTruthy", function () {
+      expect(res.body.active).to.be.ok;
+    });
+    test("res.body.archived: isFalsy", function () {
+      expect(res.body.archived).to.not.be.ok;
+    });
+    test("res.body.payload: isJson", function () {
+      expect(res.body.payload).to.satisfy((v) => { if (typeof v === 'object' && v !== null) return true; try { JSON.parse(v); return true; } catch { return false; } });
+    });
+    test("res.body.price: isNumber", function () {
+      expect(res.body.price).to.be.a('number');
+    });
+    test("res.body.label: isString", function () {
+      expect(res.body.label).to.be.a('string');
+    });
+    test("res.body.flag: isBoolean", function () {
+      expect(res.body.flag).to.be.a('boolean');
+    });
+    test("res.body.tags: isArray", function () {
+      expect(res.body.tags).to.be.an('array');
+    });
+    test("res.body.owner: eq {{ownerId}}", function () {
+      expect(res.body.owner).to.equal(bru.interpolate("{{ownerId}}"));
+    });
+    test("res.body.version: 3", function () {
+      expect(res.body.version).to.equal(3);
+    });
+source:
+  format: bruno
+  file: Assertions.bru
+  item: Assertions.bru
+
+--- environments/local.yaml (environment)
+name: Local
+vars:
+  baseUrl: http://localhost:8080
+  sku: SKU-1001
+
+--- environments/local.local.yaml (environment)
+vars:
+  token: ""
+  apiKey: ""
+
+--- environments/staging.yaml (environment)
+name: Staging
+vars:
+  baseUrl: https://staging.shop.example.com
+  hook: "{{baseUrl}}/hooks"
+
+--- report
+- file: collection.bru
+  location: collection.bru
+  name: Shop API
+  outcome: converted
+  notes: []
+- file: Carts/folder.bru
+  location: Carts/folder.bru
+  name: Carts
+  outcome: converted-with-notes
+  notes:
+    - "{{process.env.API_KEY}} became {{API_KEY}}; define API_KEY in an environment"
+  id: 010-carts
+- file: Carts/Archive/folder.bru
+  location: Carts/Archive/folder.bru
+  name: Archive
+  outcome: converted-with-notes
+  notes:
+    - 'basic auth uses variables (archivist:{{archivePassword}}), which cannot be encoded at import time; the header reads "Basic {{basicAuth}}": set basicAuth to the base64 of user:password'
+  id: 010-carts/010-archive
+- file: Carts/Archive/List archived.bru
+  location: Carts/Archive/List archived.bru
+  name: List archived
+  outcome: converted
+  notes: []
+  id: 010-carts/010-archive/010-list-archived
+- file: Carts/Create cart.bru
+  location: Carts/Create cart.bru
+  name: Create cart
+  outcome: converted-with-notes
+  notes:
+    - the disabled variable unused was dropped
+    - the disabled assertion res.body.legacy was dropped
+    - the post-response script uses bru.setNextRequest, which Janus scripts cannot call (the step fails script-unsupported)
+  id: 010-carts/020-create-cart
+- file: Carts/Get cart.bru
+  location: Carts/Get cart.bru
+  name: Get cart
+  outcome: converted-with-notes
+  notes:
+    - the disabled query parameter debug was dropped; Janus keeps the query in the URL
+  id: 010-carts/030-get-cart
+- file: Carts/Remove item.bru
+  location: Carts/Remove item.bru
+  name: Remove item
+  outcome: converted
+  notes: []
+  id: 010-carts/040-remove-item
+- file: Uploads/folder.bru
+  location: Uploads/folder.bru
+  name: Uploads
+  outcome: converted
+  notes: []
+  id: 020-uploads
+- file: Uploads/Avatar.bru
+  location: Uploads/Avatar.bru
+  name: Avatar
+  outcome: converted-with-notes
+  notes:
+    - the file part "avatar" refers to images/avatar.png, which is not in the export; copy it beside the request as avatar.png
+  id: 020-uploads/010-avatar
+- file: Uploads/Form.bru
+  location: Uploads/Form.bru
+  name: Form
+  outcome: converted
+  notes: []
+  id: 020-uploads/020-form
+- file: Uploads/Raw.bru
+  location: Uploads/Raw.bru
+  name: Raw
+  outcome: converted-with-notes
+  notes:
+    - the file body refers to fixtures/export.bin, which is not in the export; copy it beside the request as export.bin
+  id: 020-uploads/030-raw
+- file: Search.bru
+  location: Search.bru
+  name: Search
+  outcome: converted
+  notes: []
+  id: 030-search
+- file: Notes.bru
+  location: Notes.bru
+  name: Notes
+  outcome: converted-with-notes
+  notes:
+    - variable "user name" is outside the Janus variable grammar; it was renamed user_name
+  id: 040-notes
+- file: Order.bru
+  location: Order.bru
+  name: Order
+  outcome: converted-with-notes
+  notes:
+    - auth type "digest" was not converted; add its header or script by hand
+  id: 050-order
+- file: Query.bru
+  location: Query.bru
+  name: Query
+  outcome: converted-with-notes
+  notes:
+    - "the SPARQL body is sent as text; add Content-Type: application/sparql-query if the server needs it"
+  id: 060-query
+- file: Assertions.bru
+  location: Assertions.bru
+  name: Assertions
+  outcome: converted
+  notes: []
+  id: 070-assertions
+- file: Stream.bru
+  location: Stream.bru
+  name: Stream
+  outcome: skipped
+  notes:
+    - grpc requests are not HTTP requests and are not imported
+- file: Socket.bru
+  location: Socket.bru
+  name: Socket
+  outcome: skipped
+  notes:
+    - ws requests are not HTTP requests and are not imported
+- file: Broken.bru
+  location: Broken.bru
+  name: Broken.bru
+  outcome: skipped
+  notes:
+    - "the file could not be parsed: Line 6, col 5:   5 |  > 6 | get {"
+- file: environments/Local.bru
+  location: environments/Local.bru
+  name: Local
+  outcome: converted-with-notes
+  notes:
+    - the disabled variable legacyUrl was dropped
+    - the secret token was written to the .local.yaml file with an empty value; fill it in
+    - the secret apiKey was written to the .local.yaml file with an empty value; fill it in
+- file: environments/Staging.bru
+  location: environments/Staging.bru
+  name: Staging
+  outcome: converted-with-notes
+  notes:
+    - the value of hook contains "{{", which environment values do not render
+- file: .env
+  location: .env
+  name: .env
+  outcome: skipped
+  notes:
+    - "the .env file was not imported: its values are secrets that {{process.env.…}} reads; define them in an environment .local.yaml"
+- file: README.md
+  location: README.md
+  name: README.md
+  outcome: skipped
+  notes:
+    - the file is not part of a Bruno collection and was not imported

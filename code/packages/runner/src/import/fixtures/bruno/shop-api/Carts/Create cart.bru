@@ -1,0 +1,60 @@
+meta {
+  name: Create cart
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/carts
+  body: json
+  auth: inherit
+}
+
+headers {
+  Idempotency-Key: {{$randomUUID}}
+  ~X-Debug: 1
+}
+
+body:json {
+  {
+    "currency": "{{currency}}",
+    "customer": "{{$randomFullName}}",
+    "quantity": {{qty}}
+  }
+}
+
+vars:pre-request {
+  qty: 2
+  ~unused: 1
+}
+
+vars:post-response {
+  cartId: res.body.id
+  firstSku: res("items[0].sku")
+  cartEtag: res.headers.etag
+  itemCount: res.body.items.filter(i => i.qty > 0).length
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: isString
+  ~res.body.legacy: isDefined
+}
+
+script:pre-request {
+  bru.setVar("startedAt", Date.now());
+}
+
+script:post-response {
+  bru.setNextRequest("Get cart");
+}
+
+tests {
+  test("has an id", function () {
+    expect(res.body.id).to.be.a("string");
+  });
+}
+
+docs {
+  Creates a cart for the current customer.
+}

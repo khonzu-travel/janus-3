@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": [
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "apps/ui/vite.config.ts",
+    "apps/ui/scripts/**/*.ts",
+    "scripts/**/*.ts"
+  ]
+}

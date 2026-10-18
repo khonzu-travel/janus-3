@@ -1,0 +1,6 @@
+{
+  "id": "{{$ulid}}",
+  "customer": "{{$body.$.customer}}",
+  "lines": "{{$body.$.lines}}",
+  "createdAt": "{{$now}}"
+}

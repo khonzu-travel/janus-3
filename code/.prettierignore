@@ -1,0 +1,8 @@
+dist
+coverage
+pnpm-lock.yaml
+examples/data
+test-results
+playwright-report
+apps/desktop/release
+packages/runner/src/sandbox/chai-source.generated.ts

@@ -1,0 +1,22 @@
+meta {
+  name: Avatar
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/uploads/avatar
+  body: multipart-form
+  auth: basic
+}
+
+auth:basic {
+  username: uploader
+  password: hunter2
+}
+
+body:multipart-form {
+  caption: Holiday
+  avatar: @file(images/avatar.png)
+  ~draft: true
+}

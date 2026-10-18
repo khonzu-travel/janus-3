@@ -1,0 +1,11 @@
+{
+  "id": "{{$path.orderId}}",
+  "reference": "{{$uuid}}",
+  "customer": "{{$faker.person.fullName}}",
+  "item": "{{$faker.commerce.productName}}",
+  "quantity": "{{$randomInt(1,5)}}",
+  "status": "{{$randomFrom(\"pending\", \"shipped\", \"delivered\")}}",
+  "placedAt": "{{$now}}",
+  "restockDate": "{{$today+14d}}",
+  "note": "Deliver by {{$oneWeekFromToday:\"EEE d MMM\"}}; {{$$today}} is written literally"
+}

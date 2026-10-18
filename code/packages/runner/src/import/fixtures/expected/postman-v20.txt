@@ -1,0 +1,136 @@
+# format: postman
+# collection: users-v2-0 (Users (v2.0))
+
+--- folder.yaml (folder)
+name: Users (v2.0)
+headers:
+  - name: Authorization
+    value: Basic c3ZjOnB3
+
+--- 010-list-users.request.yaml (request)
+name: List users
+method: GET
+url: https://api.example.com/users?page=1
+headers:
+  - name: Accept
+    value: application/json
+source:
+  format: postman
+  file: users-v20.postman_collection.json
+  item: item[0]
+
+--- 020-get-user.request.yaml (request)
+name: Get user
+method: GET
+url: https://api.example.com/users/:id?fields=name,email
+pathParams:
+  id: "42"
+headers:
+  - name: Accept
+    value: application/json
+  - name: X-Trace
+    value: "{{$uuid}}"
+source:
+  format: postman
+  file: users-v20.postman_collection.json
+  item: item[1]
+
+--- 030-create-user.request.yaml (request)
+name: Create user
+method: POST
+url: "{{host}}/users"
+headers:
+  - name: Content-Type
+    value: application/json
+  - name: Authorization
+    value: ""
+    disabled: true
+  - name: Authorization
+    value: Bearer {{token}}
+body:
+  type: json
+  text: '{"name":"{{$faker.person.fullName}}"}'
+scripts:
+  after: |-
+    tests['created'] = responseCode.code === 201;
+    postman.setNextRequest('Get user');
+source:
+  format: postman
+  file: users-v20.postman_collection.json
+  item: item[2]
+
+--- 040-key-in-query.request.yaml (request)
+name: Key in query
+method: GET
+url: https://api.example.com/users/search?q=ada&key={{apiKey}}#top
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+source:
+  format: postman
+  file: users-v20.postman_collection.json
+  item: item[3]
+
+--- 050-digest.request.yaml (request)
+name: Digest
+method: GET
+url: https://api.example.com/digest
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+source:
+  format: postman
+  file: users-v20.postman_collection.json
+  item: item[4]
+
+--- environments/users-local.yaml (environment)
+name: Users local
+vars:
+  host: http://localhost:8080
+  token: dev-token
+
+--- report
+- file: users-v20.postman_collection.json
+  location: ""
+  name: Users (v2.0)
+  outcome: converted
+  notes: []
+- file: users-v20.postman_collection.json
+  location: item[0]
+  name: List users
+  outcome: converted
+  notes: []
+  id: 010-list-users
+- file: users-v20.postman_collection.json
+  location: item[1]
+  name: Get user
+  outcome: converted
+  notes: []
+  id: 020-get-user
+- file: users-v20.postman_collection.json
+  location: item[2]
+  name: Create user
+  outcome: converted-with-notes
+  notes:
+    - the test script uses postman.setNextRequest, which Janus scripts cannot call (the step fails script-unsupported)
+  id: 030-create-user
+- file: users-v20.postman_collection.json
+  location: item[3]
+  name: Key in query
+  outcome: converted
+  notes: []
+  id: 040-key-in-query
+- file: users-v20.postman_collection.json
+  location: item[4]
+  name: Digest
+  outcome: converted-with-notes
+  notes:
+    - auth type "digest" was not converted; add its header or script by hand
+  id: 050-digest
+- file: users.postman_environment.json
+  location: ""
+  name: Users local
+  outcome: converted
+  notes: []

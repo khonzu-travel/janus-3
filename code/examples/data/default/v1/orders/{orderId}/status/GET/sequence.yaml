@@ -1,0 +1,3 @@
+# Each session polling this order sees pending twice, then the plain 200 for
+# every later request. Requests without a session always get step 1.
+steps: [202.pending, 202.pending, 200]

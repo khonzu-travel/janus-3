@@ -1,0 +1,4 @@
+{
+  "error": "card-declined",
+  "orderId": "{{$scenario.ids.orderId}}"
+}

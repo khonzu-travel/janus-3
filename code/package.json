@@ -1,0 +1,47 @@
+{
+  "name": "janus-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=22.22"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck && tsc -p tests/tsconfig.json && tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "schema": "node --import tsx --conditions=@janus/source scripts/write-config-schema.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:budgets && pnpm test:e2e && pnpm test:desktop",
+    "janus": "node apps/server/dist/bin.js",
+    "ui:dev": "pnpm --filter @janus/ui run dev",
+    "test:budgets": "pnpm --filter @janus/ui run budgets",
+    "test:e2e": "pnpm --filter @janus/ui run build && playwright test",
+    "test:desktop": "pnpm --filter @janus/desktop run test:desktop",
+    "desktop": "pnpm --filter @janus/desktop run start"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^10.0.1",
+    "@janus/core": "workspace:*",
+    "@janus/fixtures-fs": "workspace:*",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.4",
+    "@vitest/coverage-v8": "^5.0.2",
+    "ajv": "^8.20.0",
+    "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^5.0.2",
+    "yaml": "^2.9.1"
+  }
+}

@@ -1,0 +1,11 @@
+name: Get order
+method: GET
+url: '{{baseUrl}}/v1/orders/:orderId'
+pathParams:
+  orderId: '{{orderId}}'
+scripts:
+  after: |
+    test('returns the order just created', () => {
+      expect(res.status).to.equal(200);
+      expect(res.body.id).to.equal(bru.getVar('orderId'));
+    });

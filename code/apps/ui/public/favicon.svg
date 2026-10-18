@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- The Janus mark (src/layouts/ThemeLogo.tsx), coloured for the browser's light or dark tab strip. -->
+  <style>g{color:#1c1f24}@media (prefers-color-scheme:dark){g{color:#e4e7eb}}</style>
+  <g stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+    <path d="M12 2L22 12L12 22L2 12Z" fill="none"/>
+    <path d="M12 2L22 12L12 22Z" fill="currentColor"/>
+  </g>
+</svg>

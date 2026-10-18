@@ -1,0 +1,25 @@
+name: Create order
+method: POST
+url: '{{baseUrl}}/v1/orders'
+headers:
+  - name: Idempotency-Key
+    value: '{{$uuid}}'
+body:
+  type: json
+  text: |
+    {
+      "customer": "{{customer}}",
+      "lines": [{ "sku": "SKU-1", "quantity": 2 }]
+    }
+vars:
+  customer: Ada Lovelace
+# The order's ID, for the next request.
+extract:
+  orderId: '{{$response.body.$.id}}'
+scripts:
+  after: |
+    pm.test('the order is created', () => {
+      pm.response.to.have.status(201);
+      pm.expect(pm.response.json().customer).to.equal('Ada Lovelace');
+    });
+docs: Creates an order. In record mode, POST /v1/orders is sent to the environment's baseUrl.

@@ -1,0 +1,55 @@
+/*
+ * The Atlas design tokens: the colour custom properties,
+ * light under :root and dark under :root[data-theme='dark']. index.html links
+ * this file before the bundle; the desktop app's own pages link it too
+ *. Served unchanged, so keep it plain CSS.
+ */
+:root {
+  --bg: #f6f7f8;
+  --surface: #ffffff;
+  --fg: #1c1f24;
+  --muted: #5f6670;
+  --faint: #666d77;
+  --line: #e2e5e9;
+  --line-strong: #c3c9d0;
+  --hover: #eef0f3;
+  --accent: #3249c9;
+  --accent-soft: #eceffc;
+  --ok: #1f7a4d;
+  --ok-soft: #e7f4ec;
+  --warn: #8a5200;
+  --warn-soft: #fbf1df;
+  --bad: #b4232f;
+  --bad-soft: #fbe9ea;
+  --tok-bg: #fff1c7;
+  --tok-fg: #6b4800;
+  --m-get: #1f6f8b;
+  --m-post: #8a5a00;
+  --m-delete: #a32a3a;
+  --m-put: #6a3fb0;
+}
+
+:root[data-theme='dark'] {
+  --bg: #111316;
+  --surface: #171a1e;
+  --fg: #e4e7eb;
+  --muted: #9aa1ab;
+  --faint: #8b929c;
+  --line: #262a30;
+  --line-strong: #3a4048;
+  --hover: #1e2227;
+  --accent: #8d9cff;
+  --accent-soft: #23284a;
+  --ok: #5fcf95;
+  --ok-soft: #15291f;
+  --warn: #e6b354;
+  --warn-soft: #2c2312;
+  --bad: #ff7f8a;
+  --bad-soft: #321a1d;
+  --tok-bg: #3a3014;
+  --tok-fg: #f3d27a;
+  --m-get: #6cc3df;
+  --m-post: #e5b153;
+  --m-delete: #ff8c99;
+  --m-put: #b99cff;
+}

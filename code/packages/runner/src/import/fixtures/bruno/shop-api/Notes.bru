@@ -1,0 +1,15 @@
+meta {
+  name: Notes
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/v1/notes
+  body: text
+  auth: inherit
+}
+
+body:text {
+  Hello from {{user name}}
+}

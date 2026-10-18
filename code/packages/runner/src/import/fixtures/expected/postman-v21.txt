@@ -1,0 +1,383 @@
+# format: postman
+# collection: checkout-api (Checkout API)
+
+--- folder.yaml (folder)
+name: Checkout API
+vars:
+  baseUrl: https://api.example.com
+  api.version: v1
+  user_name: Ada
+headers:
+  - name: Authorization
+    value: Bearer {{token}}
+scripts:
+  before: "pm.request.headers.upsert({ key: 'X-Request-Start', value: String(Date.now()) });"
+docs: Cart and payment endpoints of the **checkout** service.
+
+--- 010-carts/folder.yaml (folder)
+name: Carts
+docs: Everything about carts.
+
+--- 010-carts/010-create-cart.request.yaml (request)
+name: Create cart
+method: POST
+url: "{{baseUrl}}/v1/carts"
+headers:
+  - name: Content-Type
+    value: application/json
+  - name: Idempotency-Key
+    value: "{{$uuid}}"
+  - name: X-Debug
+    value: "1"
+    disabled: true
+body:
+  type: json
+  text: |-
+    {
+      "customer": "{{$faker.person.firstName}} {{$faker.person.lastName}}",
+      "email": "{{$faker.internet.email}}",
+      "createdAt": {{$now:unix}},
+      "at": "{{$now}}",
+      "lucky": {{$randomInt(0,1000)}},
+      "ref": "{{$uuid}}",
+      "due": "{{$$randomDateFuture}}",
+      "city": "{{$faker.location.city}}"
+    }
+scripts:
+  before: |-
+    pm.sendRequest(pm.environment.get('baseUrl') + '/v1/warmup', function () {});
+    pm.variables.set('started', Date.now());
+  after: |-
+    pm.test('created', function () {
+      pm.response.to.have.status(201);
+    });
+    pm.environment.set('cartId', pm.response.json().id);
+docs: Creates an empty cart.
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[0].item[0]
+
+--- 010-carts/020-add-item.request.yaml (request)
+name: Add item
+method: POST
+url: "{{baseUrl}}/v1/carts/:cartId/items?expand=true"
+pathParams:
+  cartId: "{{cartId}}"
+headers:
+  - name: If-Match
+    value: "{{cartEtag}}"
+body:
+  type: json
+  text: '{ "sku": "{{sku}}", "quantity": {{qty}} }'
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[0].item[1]
+
+--- 010-carts/030-admin/folder.yaml (folder)
+name: Admin
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+  - name: Authorization
+    value: Basic YWRtaW46czNjcmV0
+
+--- 010-carts/030-admin/010-purge-carts.request.yaml (request)
+name: Purge carts
+method: DELETE
+url: "{{baseUrl}}/v1/carts?olderThan=30d"
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[0].item[2].item[0]
+
+--- 010-carts/030-admin/020-cart-report.request.yaml (request)
+name: Cart report
+method: GET
+url: "{{baseUrl}}/v1/admin/report"
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[0].item[2].item[1]
+
+--- 020-uploads/folder.yaml (folder)
+name: Uploads
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+
+--- 020-uploads/010-upload-avatar.request.yaml (request)
+name: Upload avatar
+method: POST
+url: "{{baseUrl}}/v1/uploads/avatar?api_key={{apiKey}}"
+body:
+  type: multipart
+  parts:
+    - name: caption
+      value: Me at {{$faker.location.city}}
+    - name: avatar
+      file: avatar.png
+    - name: meta
+      value: '{"v":1}'
+    - name: draft
+      value: "true"
+      disabled: true
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[1].item[0]
+
+--- 020-uploads/020-upload-raw.request.yaml (request)
+name: Upload raw
+method: PUT
+url: "{{baseUrl}}/v1/uploads/raw?api_key={{apiKey}}"
+headers:
+  - name: Content-Type
+    value: application/octet-stream
+body:
+  type: file
+  file: export.bin
+  contentType: application/octet-stream
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[1].item[1]
+
+--- 020-uploads/030-login-form.request.yaml (request)
+name: Login form
+method: POST
+url: "{{baseUrl}}/oauth/token"
+headers:
+  - name: Authorization
+    value: Basic {{basicAuth}}
+body:
+  type: form
+  fields:
+    - name: grant_type
+      value: password
+    - name: scope
+      value: carts payments
+    - name: debug
+      value: "true"
+      disabled: true
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[1].item[2]
+
+--- 030-search-products.request.yaml (request)
+name: Search products
+method: POST
+url: "{{baseUrl}}/graphql"
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+body:
+  type: graphql
+  query: |-
+    query Search($q: String!) {
+      products(q: $q) { id name }
+    }
+  variables: |-
+    {
+      "q": "{{term}}"
+    }
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[2]
+
+--- 040-order-as-xml.request.yaml (request)
+name: Order as XML
+method: POST
+url: "{{baseUrl}}/v1/orders"
+headers:
+  - name: Authorization
+    value: ""
+    disabled: true
+  - name: X-Api-Key
+    value: "{{apiKey}}"
+body:
+  type: xml
+  text: <order><sku>{{sku}}</sku></order>
+docs: Legacy XML endpoint.
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[3]
+
+--- 050-note.request.yaml (request)
+name: Note
+method: POST
+url: http://localhost:3000/notes
+body:
+  type: text
+  text: "Hello {{user_name}}, mood: {{$faker.company.buzzPhrase}}"
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[4]
+
+--- 060-health.request.yaml (request)
+name: Health
+method: GET
+url: https://status.example.com/health
+source:
+  format: postman
+  file: checkout-v21.postman_collection.json
+  item: item[5]
+
+--- environments/staging.yaml (environment)
+name: Staging
+vars:
+  baseUrl: https://staging.api.example.com
+  sku: SKU-1001
+  callback: "{{baseUrl}}/hooks"
+
+--- environments/staging.local.yaml (environment)
+vars:
+  token: eyJhbGciOiJIUzI1NiJ9.e30.sig
+  apiKey: ""
+
+--- report
+- file: checkout-v21.postman_collection.json
+  location: ""
+  name: Checkout API
+  outcome: converted-with-notes
+  notes:
+    - variable "user name" is outside the Janus variable grammar; it was renamed user_name
+    - the disabled variable legacy was dropped
+- file: checkout-v21.postman_collection.json
+  location: item[0]
+  name: Carts
+  outcome: converted
+  notes: []
+  id: 010-carts
+- file: checkout-v21.postman_collection.json
+  location: item[0].item[0]
+  name: Create cart
+  outcome: converted-with-notes
+  notes:
+    - the description of the header X-Debug was dropped
+    - "{{$randomDateFuture}} has no Janus equivalent; it is kept as the literal text {{$$randomDateFuture}}"
+    - the pre-request script uses pm.sendRequest, which Janus scripts cannot call (the step fails script-unsupported)
+  id: 010-carts/010-create-cart
+- file: checkout-v21.postman_collection.json
+  location: item[0].item[1]
+  name: Add item
+  outcome: converted-with-notes
+  notes:
+    - the disabled query parameter debug was dropped; Janus keeps the query in the URL
+  id: 010-carts/020-add-item
+- file: checkout-v21.postman_collection.json
+  location: item[0].item[2]
+  name: Admin
+  outcome: converted
+  notes: []
+  id: 010-carts/030-admin
+- file: checkout-v21.postman_collection.json
+  location: item[0].item[2].item[0]
+  name: Purge carts
+  outcome: converted
+  notes: []
+  id: 010-carts/030-admin/010-purge-carts
+- file: checkout-v21.postman_collection.json
+  location: item[0].item[2].item[1]
+  name: Cart report
+  outcome: converted
+  notes: []
+  id: 010-carts/030-admin/020-cart-report
+- file: checkout-v21.postman_collection.json
+  location: item[1]
+  name: Uploads
+  outcome: converted-with-notes
+  notes:
+    - the API key query parameter "api_key" is added to each request below that inherits it
+  id: 020-uploads
+- file: checkout-v21.postman_collection.json
+  location: item[1].item[0]
+  name: Upload avatar
+  outcome: converted-with-notes
+  notes:
+    - the API key query parameter "api_key" inherited from "Uploads" was added to the URL
+    - the file part "avatar" refers to /Users/me/Pictures/avatar.png, which is not in the export; copy it beside the request as avatar.png
+    - the content type of the part "meta" was dropped
+  id: 020-uploads/010-upload-avatar
+- file: checkout-v21.postman_collection.json
+  location: item[1].item[1]
+  name: Upload raw
+  outcome: converted-with-notes
+  notes:
+    - the API key query parameter "api_key" inherited from "Uploads" was added to the URL
+    - the file body refers to C:\data\export.bin, which is not in the export; copy it beside the request as export.bin
+  id: 020-uploads/020-upload-raw
+- file: checkout-v21.postman_collection.json
+  location: item[1].item[2]
+  name: Login form
+  outcome: converted-with-notes
+  notes:
+    - 'basic auth uses variables ({{user}}:{{pass}}), which cannot be encoded at import time; the header reads "Basic {{basicAuth}}": set basicAuth to the base64 of user:password'
+  id: 020-uploads/030-login-form
+- file: checkout-v21.postman_collection.json
+  location: item[2]
+  name: Search products
+  outcome: converted-with-notes
+  notes:
+    - auth type "oauth2" was not converted; add its header or script by hand
+    - protocolProfileBehavior settings were dropped
+  id: 030-search-products
+- file: checkout-v21.postman_collection.json
+  location: item[3]
+  name: Order as XML
+  outcome: converted
+  notes: []
+  id: 040-order-as-xml
+- file: checkout-v21.postman_collection.json
+  location: item[4]
+  name: Note
+  outcome: converted-with-notes
+  notes:
+    - the URL had no scheme; http:// was added, as Postman assumes
+    - variable "user name" is outside the Janus variable grammar; it was renamed user_name
+  id: 050-note
+- file: checkout-v21.postman_collection.json
+  location: item[5]
+  name: Health
+  outcome: converted
+  notes: []
+  id: 060-health
+- file: checkout-v21.postman_collection.json
+  location: item[6]
+  name: Trace
+  outcome: skipped
+  notes:
+    - the method TRACE cannot be sent by Janus
+- file: checkout-v21.postman_collection.json
+  location: item[7]
+  name: Placeholder
+  outcome: skipped
+  notes:
+    - the item has neither a request nor items
+- file: staging.postman_environment.json
+  location: ""
+  name: Staging
+  outcome: converted-with-notes
+  notes:
+    - the secret token was written to the .local.yaml file
+    - the secret apiKey was written to the .local.yaml file with an empty value; fill it in
+    - the value of callback contains "{{", which environment values do not render
+    - the disabled variable old was dropped
+- file: globals.postman_globals.json
+  location: ""
+  name: My Workspace Globals
+  outcome: skipped
+  notes:
+    - Postman globals are not part of a collection and are not imported

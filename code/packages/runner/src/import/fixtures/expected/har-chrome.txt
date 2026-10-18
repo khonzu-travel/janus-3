@@ -1,0 +1,262 @@
+# format: har
+# collection: chrome (chrome)
+
+--- folder.yaml (folder)
+name: chrome
+
+--- 010-shop-example-com/folder.yaml (folder)
+name: https://shop.example.com
+
+--- 010-shop-example-com/010-get.request.yaml (request)
+name: GET /
+method: GET
+url: "{{shopExampleComBaseUrl}}/"
+headers:
+  - name: accept
+    value: text/html
+  - name: user-agent
+    value: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+source:
+  format: har
+  file: chrome.har
+  item: log.entries[0]
+
+--- 020-api-shop-example-com/folder.yaml (folder)
+name: https://api.shop.example.com
+
+--- 020-api-shop-example-com/010-post-login.request.yaml (request)
+name: POST /v1/login
+method: POST
+url: "{{apiShopExampleComBaseUrl}}/v1/login"
+headers:
+  - name: content-type
+    value: application/x-www-form-urlencoded
+  - name: user-agent
+    value: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+body:
+  type: form
+  fields:
+    - name: user
+      value: ada@example.com
+    - name: password
+      value: p&ss
+source:
+  format: har
+  file: chrome.har
+  item: log.entries[4]
+
+--- 020-api-shop-example-com/020-post-carts.request.yaml (request)
+name: POST /v1/carts?source=web
+method: POST
+url: "{{apiShopExampleComBaseUrl}}/v1/carts?source=web"
+headers:
+  - name: content-type
+    value: application/json
+  - name: authorization
+    value: Bearer eyJ.recorded
+  - name: user-agent
+    value: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+body:
+  type: json
+  text: '{"items":[{"sku":"SKU-1001","qty":1}]}'
+source:
+  format: har
+  file: chrome.har
+  item: log.entries[5]
+
+--- 020-api-shop-example-com/030-post-uploads.request.yaml (request)
+name: POST /v1/uploads
+method: POST
+url: "{{apiShopExampleComBaseUrl}}/v1/uploads"
+headers:
+  - name: user-agent
+    value: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+body:
+  type: multipart
+  parts:
+    - name: caption
+      value: Holiday
+    - name: photo
+      file: beach.jpg
+      contentType: image/jpeg
+source:
+  format: har
+  file: chrome.har
+  item: log.entries[6]
+
+--- 030-api-shop-example-com-8443/folder.yaml (folder)
+name: https://api.shop.example.com:8443
+
+--- 030-api-shop-example-com-8443/010-get-health.request.yaml (request)
+name: GET /v1/health?verbose=1
+method: GET
+url: "{{apiShopExampleCom8443BaseUrl}}/v1/health?verbose=1"
+headers:
+  - name: Accept
+    value: "*/*"
+  - name: user-agent
+    value: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+source:
+  format: har
+  file: chrome.har
+  item: log.entries[10]
+
+--- environments/imported.yaml (environment)
+name: Imported
+vars:
+  shopExampleComBaseUrl: https://shop.example.com
+  apiShopExampleComBaseUrl: https://api.shop.example.com
+  apiShopExampleCom8443BaseUrl: https://api.shop.example.com:8443
+
+--- report
+- file: chrome.har
+  location: log.entries[0]
+  name: GET https://shop.example.com/
+  outcome: converted
+  notes: []
+  id: 010-shop-example-com/010-get
+- file: chrome.har
+  location: log.entries[1]
+  name: GET https://shop.example.com/assets/site.css
+  outcome: skipped
+  notes:
+    - static asset (stylesheet) skipped; import with static assets included to keep it
+- file: chrome.har
+  location: log.entries[2]
+  name: GET https://shop.example.com/assets/app.js
+  outcome: skipped
+  notes:
+    - static asset (script) skipped; import with static assets included to keep it
+- file: chrome.har
+  location: log.entries[3]
+  name: GET https://fonts.example.net/inter.woff2
+  outcome: skipped
+  notes:
+    - static asset (font) skipped; import with static assets included to keep it
+- file: chrome.har
+  location: log.entries[4]
+  name: POST https://api.shop.example.com/v1/login
+  outcome: converted
+  notes: []
+  id: 020-api-shop-example-com/010-post-login
+- file: chrome.har
+  location: log.entries[5]
+  name: POST https://api.shop.example.com/v1/carts?source=web
+  outcome: converted
+  notes: []
+  id: 020-api-shop-example-com/020-post-carts
+- file: chrome.har
+  location: log.entries[6]
+  name: POST https://api.shop.example.com/v1/uploads
+  outcome: converted-with-notes
+  notes:
+    - the file part "photo" refers to beach.jpg, which is not in the export; copy it beside the request as beach.jpg
+    - the multipart body is rebuilt from its parts; its recorded Content-Type and boundary were dropped
+  id: 020-api-shop-example-com/030-post-uploads
+- file: chrome.har
+  location: log.entries[7]
+  name: GET https://api.shop.example.com/v1/recommendations
+  outcome: skipped
+  notes:
+    - the transaction is incomplete (net::ERR_CONNECTION_REFUSED) and is not imported
+- file: chrome.har
+  location: log.entries[8]
+  name: GET wss://live.shop.example.com/updates
+  outcome: skipped
+  notes:
+    - wss is not an HTTP scheme; the transaction is not imported
+- file: chrome.har
+  location: log.entries[9]
+  name: GET https://shop.example.com/img/hero.webp
+  outcome: skipped
+  notes:
+    - static asset (image) skipped; import with static assets included to keep it
+- file: chrome.har
+  location: log.entries[10]
+  name: GET https://api.shop.example.com:8443/v1/health?verbose=1
+  outcome: converted-with-notes
+  notes:
+    - "hop-by-hop headers were dropped: Connection"
+  id: 030-api-shop-example-com-8443/010-get-health
+
+--- origins
+- origin: https://shop.example.com
+  variable: shopExampleComBaseUrl
+  transactions: 4
+- origin: https://fonts.example.net
+  variable: fontsExampleNetBaseUrl
+  transactions: 1
+- origin: https://api.shop.example.com
+  variable: apiShopExampleComBaseUrl
+  transactions: 4
+- origin: https://api.shop.example.com:8443
+  variable: apiShopExampleCom8443BaseUrl
+  transactions: 1
+
+--- transactions
+- position: 1
+  method: GET
+  url: https://shop.example.com/
+  origin: https://shop.example.com
+  static: false
+  included: true
+- position: 2
+  method: GET
+  url: https://shop.example.com/assets/site.css
+  origin: https://shop.example.com
+  static: true
+  included: false
+- position: 3
+  method: GET
+  url: https://shop.example.com/assets/app.js
+  origin: https://shop.example.com
+  static: true
+  included: false
+- position: 4
+  method: GET
+  url: https://fonts.example.net/inter.woff2
+  origin: https://fonts.example.net
+  static: true
+  included: false
+- position: 5
+  method: POST
+  url: https://api.shop.example.com/v1/login
+  origin: https://api.shop.example.com
+  static: false
+  included: true
+- position: 6
+  method: POST
+  url: https://api.shop.example.com/v1/carts?source=web
+  origin: https://api.shop.example.com
+  static: false
+  included: true
+- position: 7
+  method: POST
+  url: https://api.shop.example.com/v1/uploads
+  origin: https://api.shop.example.com
+  static: false
+  included: true
+- position: 8
+  method: GET
+  url: https://api.shop.example.com/v1/recommendations
+  origin: https://api.shop.example.com
+  static: false
+  included: false
+- position: 9
+  method: GET
+  url: wss://live.shop.example.com/updates
+  origin: wss://live.shop.example.com
+  static: false
+  included: false
+- position: 10
+  method: GET
+  url: https://shop.example.com/img/hero.webp
+  origin: https://shop.example.com
+  static: true
+  included: false
+- position: 11
+  method: GET
+  url: https://api.shop.example.com:8443/v1/health?verbose=1
+  origin: https://api.shop.example.com:8443
+  static: false
+  included: true

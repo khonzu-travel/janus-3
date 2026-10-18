@@ -1,0 +1,4 @@
+{
+  "order": "{{$path.orderId}}",
+  "status": "shipped"
+}

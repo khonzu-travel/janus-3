@@ -1,0 +1,55 @@
+info:
+  name: Create cart
+  type: http
+  seq: 1
+http:
+  method: POST
+  url: '{{baseUrl}}/v1/carts'
+  headers:
+    - name: Idempotency-Key
+      value: '{{$randomUUID}}'
+    - name: X-Debug
+      value: '1'
+      disabled: true
+  body:
+    type: json
+    data: |-
+      {
+        "currency": "{{currency}}",
+        "quantity": {{qty}}
+      }
+  auth: inherit
+runtime:
+  variables:
+    - name: qty
+      value: '2'
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.id
+        method: jsonq
+      variable:
+        name: cartId
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.headers.etag
+      variable:
+        name: cartEtag
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: '201'
+    - expression: res.body.items
+      operator: isArray
+  scripts:
+    - type: after-response
+      code: console.log(res.body.id);
+    - type: tests
+      code: |-
+        test("has an id", function () {
+          expect(res.body.id).to.be.a("string");
+        });
+docs: Creates a cart.

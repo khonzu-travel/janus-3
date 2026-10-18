@@ -1,0 +1,15 @@
+meta {
+  name: Raw
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/v1/uploads/raw
+  body: file
+  auth: inherit
+}
+
+body:file {
+  file: @file(fixtures/export.bin) @contentType(application/octet-stream)
+}

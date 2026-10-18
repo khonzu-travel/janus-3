@@ -1,0 +1,21 @@
+info:
+  name: Upload
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: '{{baseUrl}}/v1/uploads'
+  body:
+    type: multipart-form
+    data:
+      - name: caption
+        type: text
+        value: Holiday
+      - name: avatar
+        type: file
+        value:
+          - images/avatar.png
+  auth:
+    type: basic
+    username: uploader
+    password: hunter2

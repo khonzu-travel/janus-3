@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  // The main process, the server host, the preload and the journeys; the pages have their own tsconfig.
+  "include": ["src/**/*", "test/**/*", "scripts/**/*", "*.ts"],
+  "exclude": ["src/pages"]
+}

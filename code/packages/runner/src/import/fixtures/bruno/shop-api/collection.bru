@@ -1,0 +1,40 @@
+meta {
+  name: Shop API
+}
+
+headers {
+  X-Client: janus-import
+  ~X-Experimental: on
+}
+
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+vars:pre-request {
+  apiVersion: v2
+}
+
+vars:post-response {
+  lastStatus: res.status
+}
+
+script:pre-request {
+  req.setHeader("X-Request-Start", String(Date.now()));
+}
+
+tests {
+  test("responds quickly", function () {
+    expect(res.responseTime).to.be.below(2000);
+  });
+}
+
+docs {
+  # Shop API
+  
+  Imported from Bruno.
+}

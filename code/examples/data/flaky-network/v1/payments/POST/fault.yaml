@@ -1,0 +1,13 @@
+# Faults for POST /v1/payments in flaky-network. The first
+# matching rule decides; without a match the payment is answered normally.
+latency: { ms: 1500 }
+rules:
+  - when: { header.x-simulate: reset }
+    fault: reset
+  - when: { header.x-simulate: truncate }
+    fault: { truncate: { bytes: 16 } }
+  - when: { header.x-simulate: malformed }
+    fault: { malformed: conflicting-length }
+  # Each session: reset first, then hold the connection, then answer normally.
+  - when: { header.x-simulate: retry }
+    fault: [reset, timeout, none]

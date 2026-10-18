@@ -1,0 +1,308 @@
+# format: charles
+# collection: shop-session (shop-session)
+
+--- folder.yaml (folder)
+name: shop-session
+
+--- 010-api-example-com/folder.yaml (folder)
+name: https://api.example.com
+
+--- 010-api-example-com/010-get-carts.request.yaml (request)
+name: GET /v1/carts?limit=10&cursor={{next}}
+method: GET
+url: "{{apiExampleComBaseUrl}}/v1/carts?limit=10&cursor=%7B%7Bnext%7D%7D"
+headers:
+  - name: Accept
+    value: application/json
+  - name: User-Agent
+    value: ShopApp/5.2 (iOS 18)
+  - name: Cookie
+    value: sid=abc123
+source:
+  format: charles
+  file: shop-session.chlsj
+  item: "[0]"
+
+--- 010-api-example-com/020-post-carts.request.yaml (request)
+name: POST /v1/carts
+method: POST
+url: "{{apiExampleComBaseUrl}}/v1/carts"
+headers:
+  - name: Accept
+    value: application/json
+  - name: User-Agent
+    value: ShopApp/5.2 (iOS 18)
+  - name: Cookie
+    value: sid=abc123
+  - name: Content-Type
+    value: application/json; charset=utf-8
+body:
+  type: json
+  text: '{"currency":"EUR","note":"{{$$literal}}"}'
+source:
+  format: charles
+  file: shop-session.chlsj
+  item: "[1]"
+
+--- 010-api-example-com/030-get-c-91.request.yaml (request)
+name: GET /v1/carts/c-91
+method: GET
+url: "{{apiExampleComBaseUrl}}/v1/carts/c-91"
+headers:
+  - name: accept
+    value: application/json
+  - name: authorization
+    value: Bearer eyJ.recorded
+source:
+  format: charles
+  file: shop-session.chlsj
+  item: "[8]"
+
+--- 010-api-example-com/040-put-meta.request.yaml (request)
+name: PUT /v1/carts/c-91/:meta
+method: PUT
+url: "{{apiExampleComBaseUrl}}/v1/carts/c-91/%3Ameta"
+headers:
+  - name: Accept
+    value: application/json
+  - name: User-Agent
+    value: ShopApp/5.2 (iOS 18)
+  - name: Cookie
+    value: sid=abc123
+  - name: Content-Type
+    value: application/xml
+body:
+  type: xml
+  text: <cart><id>c-91</id></cart>
+source:
+  format: charles
+  file: shop-session.chlsj
+  item: "[9]"
+
+--- 010-api-example-com/050-options-carts.request.yaml (request)
+name: OPTIONS /v1/carts
+method: OPTIONS
+url: "{{apiExampleComBaseUrl}}/v1/carts"
+headers:
+  - name: Access-Control-Request-Method
+    value: POST
+source:
+  format: charles
+  file: shop-session.chlsj
+  item: "[10]"
+
+--- 020-localhost-8080/folder.yaml (folder)
+name: http://localhost:8080
+
+--- 020-localhost-8080/010-post-upload.body.bin (body)
+<8 bytes>
+
+--- 020-localhost-8080/010-post-upload.request.yaml (request)
+name: POST /upload
+method: POST
+url: "{{localhost8080BaseUrl}}/upload"
+headers:
+  - name: Content-Type
+    value: application/octet-stream
+body:
+  type: file
+  file: 010-post-upload.body.bin
+  contentType: application/octet-stream
+source:
+  format: charles
+  file: shop-session.chlsj
+  item: "[5]"
+
+--- 030-api-example-com-2/folder.yaml (folder)
+name: http://api.example.com
+
+--- 030-api-example-com-2/010-patch-c-91.request.yaml (request)
+name: PATCH /v1/carts/c-91?x=1
+method: PATCH
+url: "{{apiExampleCom2BaseUrl}}/v1/carts/c-91?x=1"
+headers:
+  - name: Content-Type
+    value: application/x-www-form-urlencoded
+body:
+  type: text
+  text: qty=2&note=hello%20world
+source:
+  format: charles
+  file: shop-session.chlsj
+  item: "[11]"
+
+--- environments/imported.yaml (environment)
+name: Imported
+vars:
+  apiExampleComBaseUrl: https://api.example.com
+  localhost8080BaseUrl: http://localhost:8080
+  apiExampleCom2BaseUrl: http://api.example.com
+
+--- report
+- file: shop-session.chlsj
+  location: "[0]"
+  name: GET https://api.example.com/v1/carts?limit=10&cursor={{next}}
+  outcome: converted-with-notes
+  notes:
+    - "hop-by-hop headers were dropped: Connection"
+    - braces, and ":" at the start of a path segment, were percent-encoded so the URL is not read as a template
+  id: 010-api-example-com/010-get-carts
+- file: shop-session.chlsj
+  location: "[1]"
+  name: POST https://api.example.com/v1/carts
+  outcome: converted-with-notes
+  notes:
+    - "hop-by-hop headers were dropped: Connection"
+  id: 010-api-example-com/020-post-carts
+- file: shop-session.chlsj
+  location: "[2]"
+  name: CONNECT https://telemetry.example.net/
+  outcome: skipped
+  notes:
+    - CONNECT tunnels are not imported
+- file: shop-session.chlsj
+  location: "[3]"
+  name: GET https://cdn.example.com/static/app.js
+  outcome: skipped
+  notes:
+    - static asset (script) skipped; import with static assets included to keep it
+- file: shop-session.chlsj
+  location: "[4]"
+  name: GET https://cdn.example.com/img/logo.png
+  outcome: skipped
+  notes:
+    - static asset (image) skipped; import with static assets included to keep it
+- file: shop-session.chlsj
+  location: "[5]"
+  name: POST http://localhost:8080/upload
+  outcome: converted-with-notes
+  notes:
+    - "hop-by-hop headers were dropped: Transfer-Encoding"
+    - the body is not UTF-8 text; it is kept in a file beside the request
+  id: 020-localhost-8080/010-post-upload
+- file: shop-session.chlsj
+  location: "[6]"
+  name: GET https://api.example.com/v1/slow
+  outcome: skipped
+  notes:
+    - "the transaction is incomplete (failed: Connection reset by peer) and is not imported"
+- file: shop-session.chlsj
+  location: "[7]"
+  name: GET wss://live.example.com/socket
+  outcome: skipped
+  notes:
+    - wss is not an HTTP scheme; the transaction is not imported
+- file: shop-session.chlsj
+  location: "[8]"
+  name: GET https://api.example.com/v1/carts/c-91
+  outcome: converted
+  notes: []
+  id: 010-api-example-com/030-get-c-91
+- file: shop-session.chlsj
+  location: "[9]"
+  name: PUT https://api.example.com/v1/carts/c-91/:meta
+  outcome: converted-with-notes
+  notes:
+    - "hop-by-hop headers were dropped: Connection"
+    - braces, and ":" at the start of a path segment, were percent-encoded so the URL is not read as a template
+  id: 010-api-example-com/040-put-meta
+- file: shop-session.chlsj
+  location: "[10]"
+  name: OPTIONS https://api.example.com/v1/carts
+  outcome: converted
+  notes: []
+  id: 010-api-example-com/050-options-carts
+- file: shop-session.chlsj
+  location: "[11]"
+  name: PATCH http://api.example.com/v1/carts/c-91?x=1
+  outcome: converted
+  notes: []
+  id: 030-api-example-com-2/010-patch-c-91
+
+--- origins
+- origin: https://api.example.com
+  variable: apiExampleComBaseUrl
+  transactions: 6
+- origin: https://cdn.example.com
+  variable: cdnExampleComBaseUrl
+  transactions: 2
+- origin: http://localhost:8080
+  variable: localhost8080BaseUrl
+  transactions: 1
+- origin: http://api.example.com
+  variable: apiExampleCom2BaseUrl
+  transactions: 1
+
+--- transactions
+- position: 1
+  method: GET
+  url: https://api.example.com/v1/carts?limit=10&cursor={{next}}
+  origin: https://api.example.com
+  static: false
+  included: true
+- position: 2
+  method: POST
+  url: https://api.example.com/v1/carts
+  origin: https://api.example.com
+  static: false
+  included: true
+- position: 3
+  method: CONNECT
+  url: https://telemetry.example.net/
+  origin: https://telemetry.example.net
+  static: false
+  included: false
+- position: 4
+  method: GET
+  url: https://cdn.example.com/static/app.js
+  origin: https://cdn.example.com
+  static: true
+  included: false
+- position: 5
+  method: GET
+  url: https://cdn.example.com/img/logo.png
+  origin: https://cdn.example.com
+  static: true
+  included: false
+- position: 6
+  method: POST
+  url: http://localhost:8080/upload
+  origin: http://localhost:8080
+  static: false
+  included: true
+- position: 7
+  method: GET
+  url: https://api.example.com/v1/slow
+  origin: https://api.example.com
+  static: false
+  included: false
+- position: 8
+  method: GET
+  url: wss://live.example.com/socket
+  origin: wss://live.example.com
+  static: false
+  included: false
+- position: 9
+  method: GET
+  url: https://api.example.com/v1/carts/c-91
+  origin: https://api.example.com
+  static: false
+  included: true
+- position: 10
+  method: PUT
+  url: https://api.example.com/v1/carts/c-91/:meta
+  origin: https://api.example.com
+  static: false
+  included: true
+- position: 11
+  method: OPTIONS
+  url: https://api.example.com/v1/carts
+  origin: https://api.example.com
+  static: false
+  included: true
+- position: 12
+  method: PATCH
+  url: http://api.example.com/v1/carts/c-91?x=1
+  origin: http://api.example.com
+  static: false
+  included: true

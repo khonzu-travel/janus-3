@@ -1,0 +1,16 @@
+meta {
+  name: Form
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/forms
+  body: form-urlencoded
+  auth: none
+}
+
+body:form-urlencoded {
+  name: {{$randomFirstName}}
+  ~debug: 1
+}

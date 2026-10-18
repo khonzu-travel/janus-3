@@ -1,0 +1,15 @@
+meta {
+  name: Query
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/sparql
+  body: sparql
+  auth: inherit
+}
+
+body:sparql {
+  SELECT ?s WHERE { ?s ?p ?o } LIMIT 1
+}

@@ -1,0 +1,11 @@
+# The collection's settings, inherited by every request below it.
+name: Orders
+# The environment the Requests page picks for this collection; environments
+# live in requests/environments/ and every collection can use them.
+environment: staging
+vars:
+  # The environment overrides this; without one, requests go here.
+  baseUrl: https://staging.api.example.com
+headers:
+  - name: Accept
+    value: application/json

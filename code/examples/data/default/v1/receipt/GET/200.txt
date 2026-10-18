@@ -1,0 +1,2 @@
+Receipt {{$ulid}}
+Issued {{$now@Europe/Paris:"dd/MM/yyyy HH:mm XXX"}} for {{$query.customer}}

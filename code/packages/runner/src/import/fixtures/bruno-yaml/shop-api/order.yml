@@ -1,0 +1,13 @@
+info:
+  name: Order
+  type: http
+  seq: 5
+http:
+  method: POST
+  url: '{{baseUrl}}/v1/orders'
+  body:
+    type: xml
+    data: <order><sku>{{sku}}</sku></order>
+  auth:
+    type: oauth2
+    flow: client_credentials

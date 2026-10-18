@@ -1,0 +1,1017 @@
+[
+  {
+    "status": "COMPLETE",
+    "method": "GET",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "https",
+    "host": "api.example.com",
+    "actualPort": 443,
+    "path": "/v1/carts",
+    "query": "limit=10&cursor={{next}}",
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": null,
+      "charset": null,
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "GET /v1/carts?limit=10&cursor={{next}} HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "api.example.com"
+          },
+          {
+            "name": "Connection",
+            "value": "keep-alive"
+          },
+          {
+            "name": "Accept",
+            "value": "application/json"
+          },
+          {
+            "name": "User-Agent",
+            "value": "ShopApp/5.2 (iOS 18)"
+          },
+          {
+            "name": "Cookie",
+            "value": "sid=abc123"
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": "application/json",
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/1.1 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  },
+  {
+    "status": "COMPLETE",
+    "method": "POST",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "https",
+    "host": "api.example.com",
+    "actualPort": 443,
+    "path": "/v1/carts",
+    "query": null,
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": "application/json",
+      "charset": "UTF-8",
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "POST /v1/carts HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "api.example.com"
+          },
+          {
+            "name": "Connection",
+            "value": "keep-alive"
+          },
+          {
+            "name": "Accept",
+            "value": "application/json"
+          },
+          {
+            "name": "User-Agent",
+            "value": "ShopApp/5.2 (iOS 18)"
+          },
+          {
+            "name": "Cookie",
+            "value": "sid=abc123"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json; charset=utf-8"
+          },
+          {
+            "name": "Content-Length",
+            "value": "41"
+          }
+        ]
+      },
+      "body": {
+        "text": "{\"currency\":\"EUR\",\"note\":\"{{$literal}}\"}"
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": "application/json",
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/1.1 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  },
+  {
+    "status": "COMPLETE",
+    "method": "CONNECT",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "https",
+    "host": "telemetry.example.net",
+    "actualPort": 443,
+    "path": "/",
+    "query": null,
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": null,
+      "charset": null,
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "CONNECT / HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "telemetry.example.net:443"
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": null,
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/1.1 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": null
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  },
+  {
+    "status": "COMPLETE",
+    "method": "GET",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "https",
+    "host": "cdn.example.com",
+    "actualPort": 443,
+    "path": "/static/app.js",
+    "query": null,
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": null,
+      "charset": null,
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "GET /static/app.js HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "cdn.example.com"
+          },
+          {
+            "name": "Accept",
+            "value": "*/*"
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": "application/javascript",
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/1.1 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/javascript"
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  },
+  {
+    "status": "COMPLETE",
+    "method": "GET",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "https",
+    "host": "cdn.example.com",
+    "actualPort": 443,
+    "path": "/img/logo.png",
+    "query": null,
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": null,
+      "charset": null,
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "GET /img/logo.png HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "cdn.example.com"
+          },
+          {
+            "name": "Accept",
+            "value": "image/*"
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": "image/png",
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/1.1 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "image/png"
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  },
+  {
+    "status": "COMPLETE",
+    "method": "POST",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "http",
+    "host": "localhost",
+    "actualPort": 8080,
+    "path": "/upload",
+    "query": null,
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": "application/octet-stream",
+      "charset": "UTF-8",
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "POST /upload HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "localhost:8080"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/octet-stream"
+          },
+          {
+            "name": "Transfer-Encoding",
+            "value": "chunked"
+          }
+        ]
+      },
+      "body": {
+        "encoded": "iVBORwD//hA="
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": "text/plain",
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/1.1 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "text/plain"
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  },
+  {
+    "status": "FAILED",
+    "method": "GET",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "https",
+    "host": "api.example.com",
+    "actualPort": 443,
+    "path": "/v1/slow",
+    "query": null,
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": null,
+      "charset": null,
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "GET /v1/slow HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "api.example.com"
+          },
+          {
+            "name": "Connection",
+            "value": "keep-alive"
+          },
+          {
+            "name": "Accept",
+            "value": "application/json"
+          },
+          {
+            "name": "User-Agent",
+            "value": "ShopApp/5.2 (iOS 18)"
+          },
+          {
+            "name": "Cookie",
+            "value": "sid=abc123"
+          }
+        ]
+      }
+    },
+    "errorMessage": "Connection reset by peer"
+  },
+  {
+    "status": "COMPLETE",
+    "method": "GET",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "wss",
+    "host": "live.example.com",
+    "actualPort": 443,
+    "path": "/socket",
+    "query": null,
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": true,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": null,
+      "charset": null,
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "GET /socket HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "live.example.com"
+          },
+          {
+            "name": "Upgrade",
+            "value": "websocket"
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": null,
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/1.1 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": null
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  },
+  {
+    "status": "COMPLETE",
+    "method": "GET",
+    "protocolVersion": "HTTP/2.0",
+    "scheme": "https",
+    "host": "api.example.com",
+    "actualPort": 443,
+    "path": "/v1/carts/c-91",
+    "query": null,
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": null,
+      "charset": null,
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "GET /v1/carts/c-91 HTTP/2.0",
+        "headers": [
+          {
+            "name": ":method",
+            "value": "GET"
+          },
+          {
+            "name": ":authority",
+            "value": "api.example.com"
+          },
+          {
+            "name": ":scheme",
+            "value": "https"
+          },
+          {
+            "name": ":path",
+            "value": "/v1/carts/c-91"
+          },
+          {
+            "name": "accept",
+            "value": "application/json"
+          },
+          {
+            "name": "authorization",
+            "value": "Bearer eyJ.recorded"
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": "application/json",
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/2.0 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  },
+  {
+    "status": "COMPLETE",
+    "method": "PUT",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "https",
+    "host": "api.example.com",
+    "actualPort": 443,
+    "path": "/v1/carts/c-91/:meta",
+    "query": null,
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": "application/xml",
+      "charset": "UTF-8",
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "PUT /v1/carts/c-91/:meta HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "api.example.com"
+          },
+          {
+            "name": "Connection",
+            "value": "keep-alive"
+          },
+          {
+            "name": "Accept",
+            "value": "application/json"
+          },
+          {
+            "name": "User-Agent",
+            "value": "ShopApp/5.2 (iOS 18)"
+          },
+          {
+            "name": "Cookie",
+            "value": "sid=abc123"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/xml"
+          }
+        ]
+      },
+      "body": {
+        "text": "<cart><id>c-91</id></cart>"
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": "application/json",
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/1.1 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  },
+  {
+    "status": "COMPLETE",
+    "method": "OPTIONS",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "https",
+    "host": "API.Example.com",
+    "actualPort": 443,
+    "path": "/v1/carts",
+    "query": null,
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": null,
+      "charset": null,
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "OPTIONS /v1/carts HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "api.example.com"
+          },
+          {
+            "name": "Access-Control-Request-Method",
+            "value": "POST"
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": null,
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/1.1 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": null
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  },
+  {
+    "status": "COMPLETE",
+    "method": "PATCH",
+    "protocolVersion": "HTTP/1.1",
+    "scheme": "http",
+    "host": "api.example.com",
+    "actualPort": 80,
+    "path": "/v1/carts/c-91",
+    "query": "x=1",
+    "tunnel": false,
+    "keptAlive": true,
+    "webSocket": false,
+    "remoteAddress": "203.0.113.10",
+    "clientAddress": "127.0.0.1",
+    "clientPort": 52100,
+    "times": {
+      "start": "2026-09-30T10:00:00.000+02:00",
+      "end": "2026-09-30T10:00:00.120+02:00"
+    },
+    "durations": {
+      "total": 120,
+      "dns": 0,
+      "connect": 0,
+      "ssl": 0,
+      "request": 2,
+      "response": 3,
+      "latency": 115
+    },
+    "speeds": {
+      "overall": 2400,
+      "request": 15000,
+      "response": 12000
+    },
+    "totalSize": 2048,
+    "request": {
+      "sizes": {
+        "headers": 300,
+        "body": 0
+      },
+      "mimeType": "application/x-www-form-urlencoded",
+      "charset": "UTF-8",
+      "contentEncoding": null,
+      "header": {
+        "firstLine": "PATCH /v1/carts/c-91?x=1 HTTP/1.1",
+        "headers": [
+          {
+            "name": "Host",
+            "value": "api.example.com"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ]
+      },
+      "body": {
+        "text": "qty=2&note=hello%20world"
+      }
+    },
+    "response": {
+      "status": 200,
+      "sizes": {
+        "headers": 200,
+        "body": 512
+      },
+      "mimeType": "application/json",
+      "charset": "UTF-8",
+      "contentEncoding": "gzip",
+      "header": {
+        "firstLine": "HTTP/1.1 200 OK",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "body": {
+        "text": "{}"
+      }
+    }
+  }
+]

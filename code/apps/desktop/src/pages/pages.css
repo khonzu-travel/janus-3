@@ -1,0 +1,265 @@
+@import '@janus/ui/dist/tokens.css';
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+
+/* The app's own pages, on the Atlas tokens. */
+:root {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family:
+    'IBM Plex Sans',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+h2,
+h3 {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+code,
+.mono {
+  font-family: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 880px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.faint {
+  color: var(--faint);
+}
+
+.label {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.spread {
+  justify-content: space-between;
+}
+
+button {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--hover);
+}
+
+button.primary {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--surface);
+}
+
+button.link {
+  padding: 2px 4px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+}
+
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* A state block: title, message, actions. */
+.state {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.state.error {
+  border-left: 2px solid var(--bad);
+}
+
+.state.warning {
+  border-left: 2px solid var(--warn);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.list > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.list .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+
+.recent-open .mono {
+  overflow-wrap: anywhere;
+}
+
+.missing {
+  opacity: 0.7;
+}
+
+.chip {
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.chip.error {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.chip.warning {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.problem {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 4px 8px;
+}
+
+.problem .location {
+  overflow-wrap: anywhere;
+}
+
+.log {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 16px;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.log .err {
+  color: var(--bad);
+}
+
+.log-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.log-page header {
+  padding: 8px 16px;
+}
+
+.tail {
+  max-height: 320px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (forced-colors: active) {
+  .state.error,
+  .state.warning {
+    border-left-color: CanvasText;
+  }
+}

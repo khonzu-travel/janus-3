@@ -1,0 +1,6 @@
+# Checked after accepts.yaml. A request that fails any condition gets
+# 422 expectation-failed naming the failing references, never their values.
+expect:
+  header.idempotency-key: { present: true }
+  body.$.orderId: "{{$scenario.ids.orderId}}"
+  body.$.amount.currency: EUR

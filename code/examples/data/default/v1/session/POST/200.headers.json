@@ -1,0 +1,4 @@
+{
+  "Set-Cookie": ["session=example-session-not-a-secret; Path=/; HttpOnly", "theme=light; Path=/"],
+  "Authorization": "Bearer example-token-not-a-secret"
+}

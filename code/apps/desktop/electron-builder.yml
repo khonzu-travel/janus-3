@@ -1,0 +1,57 @@
+# Installers for the Janus desktop app. scripts/package.ts
+# stages the app with `pnpm deploy`, adds the UI build and the Electron version,
+# and runs electron-builder on the staged copy.
+appId: io.github.khonzu-travel.janus
+productName: Janus
+executableName: janus-desktop
+copyright: Janus contributors
+asar: true
+# Nothing is rebuilt for Electron: no dependency has a native module (the package script checks).
+npmRebuild: false
+nodeGypRebuild: false
+buildDependenciesFromSource: false
+files:
+  - package.json
+  - dist/**
+  # The window and taskbar icon (src/main/index.ts reads build/icon.png at run time).
+  - build/icon.png
+  - '!dist/**/*.map'
+  - node_modules/**
+directories:
+  buildResources: build
+# The packaged app's fuses.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.png
+  # Unsigned: an ad-hoc signature only, which Apple silicon needs to launch the app at all.
+  identity: '-'
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: true
+  perMachine: false
+linux:
+  icon: build/icon.png
+  category: Development
+  executableName: janus-desktop
+  maintainer: Janus contributors
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+publish: null

@@ -1,0 +1,44 @@
+meta {
+  name: Assertions
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/v1/stats
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body.mode: neq "maintenance"
+  res.body.count: gt 0
+  res.body.total: gte 1
+  res.body.errors: lt 1
+  res.body.warnings: lte 5
+  res.body.region: in eu,us
+  res.body.tier: notIn "free","trial"
+  res.body.name: contains shop
+  res.body.notes: notContains secret
+  res.body.items: length 3
+  res.body.sku: matches ^SKU-\d+$
+  res.body.code: notMatches ^ERR
+  res.body.url: startsWith "https://"
+  res.body.file: endsWith .json
+  res.body.score: between 1,10
+  res.body.empty: isEmpty
+  res.body.list: isNotEmpty
+  res.body.deleted: isNull
+  res.body.missing: isUndefined
+  res.body.present: isDefined
+  res.body.active: isTruthy
+  res.body.archived: isFalsy
+  res.body.payload: isJson
+  res.body.price: isNumber
+  res.body.label: isString
+  res.body.flag: isBoolean
+  res.body.tags: isArray
+  res.body.owner: eq {{ownerId}}
+  res.body.version: 3
+}

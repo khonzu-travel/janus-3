@@ -1,0 +1,182 @@
+# format: har
+# collection: firefox (firefox)
+
+--- folder.yaml (folder)
+name: firefox
+
+--- 010-shop-example-com/folder.yaml (folder)
+name: https://shop.example.com
+
+--- 010-shop-example-com/010-get-catalog.request.yaml (request)
+name: GET /catalog?page=2&sort=price
+method: GET
+url: "{{shopExampleComBaseUrl}}/catalog?page=2&sort=price"
+headers:
+  - name: User-Agent
+    value: Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0
+  - name: Accept
+    value: text/html
+  - name: Upgrade-Insecure-Requests
+    value: "1"
+source:
+  format: har
+  file: firefox.har
+  item: log.entries[0]
+
+--- 020-api-shop-example-com/folder.yaml (folder)
+name: https://api.shop.example.com
+
+--- 020-api-shop-example-com/010-post-search.request.yaml (request)
+name: POST /v1/search
+method: POST
+url: "{{apiShopExampleComBaseUrl}}/v1/search"
+headers:
+  - name: User-Agent
+    value: Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0
+  - name: Content-Type
+    value: application/json
+  - name: X-Template
+    value: "{{$$notAToken}}"
+body:
+  type: json
+  text: '{"q":"shoes","limit":20}'
+source:
+  format: har
+  file: firefox.har
+  item: log.entries[3]
+
+--- 020-api-shop-example-com/020-post-newsletter.request.yaml (request)
+name: POST /v1/newsletter
+method: POST
+url: "{{apiShopExampleComBaseUrl}}/v1/newsletter"
+headers:
+  - name: User-Agent
+    value: Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0
+  - name: Content-Type
+    value: application/x-www-form-urlencoded
+body:
+  type: form
+  fields:
+    - name: email
+      value: ada@example.com
+source:
+  format: har
+  file: firefox.har
+  item: log.entries[4]
+
+--- 020-api-shop-example-com/030-delete-sku-1001.request.yaml (request)
+name: DELETE /v1/carts/c-91/items/SKU-1001
+method: DELETE
+url: "{{apiShopExampleComBaseUrl}}/v1/carts/c-91/items/SKU-1001"
+headers:
+  - name: User-Agent
+    value: Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0
+  - name: Accept
+    value: "*/*"
+source:
+  format: har
+  file: firefox.har
+  item: log.entries[5]
+
+--- environments/imported.yaml (environment)
+name: Imported
+vars:
+  shopExampleComBaseUrl: https://shop.example.com
+  apiShopExampleComBaseUrl: https://api.shop.example.com
+
+--- report
+- file: firefox.har
+  location: log.entries[0]
+  name: GET https://shop.example.com/catalog?page=2&sort=price
+  outcome: converted-with-notes
+  notes:
+    - "hop-by-hop headers were dropped: Connection, TE"
+  id: 010-shop-example-com/010-get-catalog
+- file: firefox.har
+  location: log.entries[1]
+  name: GET https://shop.example.com/fonts/inter.woff2
+  outcome: skipped
+  notes:
+    - static asset (font) skipped; import with static assets included to keep it
+- file: firefox.har
+  location: log.entries[2]
+  name: GET https://shop.example.com/img/logo.svg
+  outcome: skipped
+  notes:
+    - static asset (image) skipped; import with static assets included to keep it
+- file: firefox.har
+  location: log.entries[3]
+  name: POST https://api.shop.example.com/v1/search
+  outcome: converted
+  notes: []
+  id: 020-api-shop-example-com/010-post-search
+- file: firefox.har
+  location: log.entries[4]
+  name: POST https://api.shop.example.com/v1/newsletter
+  outcome: converted
+  notes: []
+  id: 020-api-shop-example-com/020-post-newsletter
+- file: firefox.har
+  location: log.entries[5]
+  name: DELETE https://api.shop.example.com/v1/carts/c-91/items/SKU-1001
+  outcome: converted
+  notes: []
+  id: 020-api-shop-example-com/030-delete-sku-1001
+- file: firefox.har
+  location: log.entries[6]
+  name: GET https://api.shop.example.com/v1/blocked
+  outcome: skipped
+  notes:
+    - the transaction is incomplete (no response was recorded) and is not imported
+
+--- origins
+- origin: https://shop.example.com
+  variable: shopExampleComBaseUrl
+  transactions: 3
+- origin: https://api.shop.example.com
+  variable: apiShopExampleComBaseUrl
+  transactions: 4
+
+--- transactions
+- position: 1
+  method: GET
+  url: https://shop.example.com/catalog?page=2&sort=price
+  origin: https://shop.example.com
+  static: false
+  included: true
+- position: 2
+  method: GET
+  url: https://shop.example.com/fonts/inter.woff2
+  origin: https://shop.example.com
+  static: true
+  included: false
+- position: 3
+  method: GET
+  url: https://shop.example.com/img/logo.svg
+  origin: https://shop.example.com
+  static: true
+  included: false
+- position: 4
+  method: POST
+  url: https://api.shop.example.com/v1/search
+  origin: https://api.shop.example.com
+  static: false
+  included: true
+- position: 5
+  method: POST
+  url: https://api.shop.example.com/v1/newsletter
+  origin: https://api.shop.example.com
+  static: false
+  included: true
+- position: 6
+  method: DELETE
+  url: https://api.shop.example.com/v1/carts/c-91/items/SKU-1001
+  origin: https://api.shop.example.com
+  static: false
+  included: true
+- position: 7
+  method: GET
+  url: https://api.shop.example.com/v1/blocked
+  origin: https://api.shop.example.com
+  static: false
+  included: false

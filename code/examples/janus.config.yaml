@@ -1,0 +1,243 @@
+# Janus configuration. Every setting is shown at its default; delete
+# what you do not change. Command-line flags override this file, and this file
+# overrides the defaults. Validate it without starting a server:
+#
+#   janus validate --config examples/janus.config.yaml
+#
+# In a project that installs @janus/server, point $schema at
+# ./node_modules/@janus/server/schema/janus.config.schema.json instead.
+$schema: ../apps/server/schema/janus.config.schema.json
+
+server:
+  # Address to bind. A non-loopback address is a startup warning: Janus has no
+  # authentication. Flag: --host.
+  host: 127.0.0.1
+  # 0 picks a free port. Flag: --port.
+  port: 4010
+  # true: /a/ never matches /a. false: exactly one trailing "/" is dropped
+  # before matching (/a// is still invalid).
+  strictTrailingSlash: true
+  # true: an OPTIONS request to a fixture path without an OPTIONS directory
+  # gets 204 with Allow. false: it gets 405.
+  autoOptions: true
+
+fixtures:
+  # Relative to this file's directory. Flag: --data (relative to the working
+  # directory).
+  root: ./data
+  # true: watch the fixture root and reload when files change. A reload swaps
+  # in the new snapshot only when it is valid; an invalid edit keeps the
+  # current one serving. POST /_janus/reload reloads on demand either way.
+  # Flag: --watch.
+  watch: false
+
+scenarios:
+  # The scenario served when a request names none and its session has no
+  # pin. It must be a directory under fixtures.root; an unknown name is a
+  # startup error. Flag: --scenario.
+  default: default
+
+sessions:
+  # Where a session key comes from when a request has no X-Mock-Session
+  # header: header.<name> or cookie.<name>, first present entry wins. The
+  # value is hashed and never stored. At most 8 entries.
+  keyFrom: []
+  # A session is dropped this many seconds after its last request (60 to
+  # 86400).
+  idleTimeout: 1800
+  # Most sessions held at once. Creating one more answers 503
+  # session-limit; nothing is evicted.
+  max: 1000
+
+# The path exists but the method does not: 405 with Allow, or 404
+# route-not-found without disclosing which methods exist.
+onUnknownMethod: 405
+
+# No route matches in the selected scenario: 404 route-not-found, or 501
+# not-mocked, which a client cannot mistake for an application 404.
+onNoFixture: 404
+
+limits:
+  # Longer request targets get 414 url-too-long.
+  maxUrlBytes: 8192
+  # Larger request header sections get 431 headers-too-large.
+  maxHeaderBytes: 16384
+  # Larger request bodies get 413 request-too-large. Plain integers only:
+  # size suffixes such as 10MiB are not supported.
+  maxBodyBytes: 1048576
+  # A body sent with Content-Encoding (gzip, deflate, br) is decoded before
+  # matching; a decoded body larger than this gets 413 decoded-body-too-large.
+  # At least maxBodyBytes.
+  maxDecodedBodyBytes: 4194304
+
+negotiation:
+  # Media types to prefer when Accept ranks several representations equally
+  # (for example "*/*" or no Accept header). Unlisted types follow in lexical
+  # order.
+  mediaTypePreference: []
+  # An Accept header with no usable media range: 400 invalid-request, or any
+  # to treat it as */*.
+  onUnusableAccept: 400
+  # No representation matches Accept: 406 not-acceptable, or ignore to serve
+  # the first representation by mediaTypePreference, then lexical order.
+  onUnacceptable: 406
+
+diagnostics:
+  # false removes every X-Mock-* header Janus adds (X-Mock-Identity,
+  # X-Mock-Representation, X-Mock-Choice, X-Mock-Replayed, X-Mock-Warning,
+  # X-Mock-Nondeterministic). The
+  # trace is unaffected.
+  headers: true
+
+dynamic:
+  # The instant {{$now}}, {{$today}} and friends render against, as RFC 3339
+  # with an offset; null uses the wall clock. A request's X-Mock-Now header
+  # overrides it. Flag: --now.
+  now: null
+  # frozen: dynamic.now never moves. offset: it starts at dynamic.now and
+  # advances with the wall clock.
+  clockMode: frozen
+  # IANA time zone for dates such as {{$today}}; never the host's zone.
+  timezone: UTC
+  # Seed for generated values ({{$uuid}}, {{$faker.person.fullName}}, ...).
+  # null picks one at startup, logs it and reports it at /_janus/clock.
+  # Flag: --seed.
+  seed: null
+  # true: a request value a token needs but the request lacks is a
+  # 500 render-failed instead of null (or "" inside a string).
+  strictRefs: false
+  # Custom clock aliases, name: <base><offsets>, e.g. trialEnd: today+30d.
+  aliases: {}
+
+atlas:
+  # false disables POST /_janus/resolve, the resolution explorer: it then
+  # answers 404 and the UI hides the explorer.
+  resolve: true
+
+ui:
+  # false stops serving the Atlas UI at /_janus/ui/, which then answers 404
+  # like any unknown Atlas path. Flag: --no-ui.
+  enabled: true
+
+cors:
+  # Origins whose pages may call the Atlas API across origins, such as a
+  # UI served by `vite dev` (http://localhost:5173) or a shared static host.
+  # Exact origins: scheme, host and optional port, no path. ["*"] allows any
+  # origin and must be the only entry. Empty (the default) disables CORS.
+  # The Janus-served UI at /_janus/ui/ never needs an entry here.
+  origins: []
+  # How long browsers may cache a preflight, in seconds (0 to 86400).
+  maxAge: 600
+  # Cross-origin access to the fixture routes, for a page under test on
+  # another origin. Separate from the Atlas origins above; never applies
+  # under /_janus.
+  fixtures:
+    # Exact origins, or ["*"] alone. Empty (the default) turns fixture CORS
+    # off.
+    origins: []
+    # true lets pages send cookies and read the answers (a session keyed by a
+    # cookie needs it). Not with ["*"].
+    credentials: false
+    # How long browsers may cache a fixture preflight, in seconds.
+    maxAge: 600
+
+idempotency:
+  # false resolves every retried request again. true: a session that repeats
+  # a request with the same key gets the stored response back, marked
+  # X-Mock-Replayed; the same key with a different request gets 422
+  # idempotency-key-reused.
+  enabled: true
+  # The request header carrying the key. Not X-Mock-*, a hop-by-hop header or
+  # Content-Type.
+  header: Idempotency-Key
+  # Methods whose responses are stored (POST, PATCH, PUT, DELETE).
+  methods: [POST, PATCH]
+  # Stored responses one session may hold; one more drops its oldest.
+  maxEntries: 1000
+
+recording:
+  # Upstream endpoints a request carrying X-Mock-Record: true may be forwarded
+  # to. Each answer is relayed to the client and written under captures/ for
+  # review. Empty (the default) disables recording. Use only dev, test or
+  # staging backends. Example:
+  #   - method: GET
+  #     path: /v1/products/{productId}
+  #     upstream: https://staging.api.example.com
+  endpoints: []
+  # Where captures are written, relative to this file. It must not overlap
+  # fixtures.root. Flag: --captures.
+  captures: ./captures
+  # true allows recording when Janus binds a non-loopback address.
+  allowNonLoopback: false
+  # Simultaneous upstream exchanges (1 to 64); one more gets 503 recording-busy.
+  maxConcurrent: 4
+  # The bound on a whole upstream exchange, in milliseconds (1000 to 600000).
+  timeoutMs: 30000
+  # A longer upstream body is abandoned as 502 recording-response-too-large.
+  maxResponseBytes: 10485760
+
+promotion:
+  # staged (the default) writes a promotion only when asked, through
+  # POST /_janus/promotions or the Promote dialog. auto promotes each new
+  # capture as it is written; it needs recording and a writable fixtures root.
+  mode: staged
+
+faults:
+  # false turns off every fault and every delay at once (for a fast CI run).
+  # fault.yaml and latency are still loaded, validated and described.
+  enabled: true
+  # How long a timeout fault holds a connection before closing it, in
+  # milliseconds (1000 to 3600000).
+  timeoutMs: 120000
+  # Connections timeout faults may hold at once (1 to 10000); one more gets
+  # 503 fault-capacity-exceeded.
+  maxHeldConnections: 128
+  # The server-wide delay before the first byte: { ms: 300 } or
+  # { min: 200, max: 800 }, drawn the same way for the same request. A
+  # scenario's flow.yaml or a method's fault.yaml can set its own.
+  latency: null
+
+compression:
+  # Fixture responses are compressed by Accept-Encoding, as a real API's
+  # are. Errors, Atlas responses and recorded relays never are.
+  enabled: true
+  # The codings Janus may use, preferred first when Accept-Encoding ranks
+  # them equally.
+  encodings: [br, gzip, deflate]
+  # JSON and text bodies smaller than this are sent as they are.
+  minBytes: 1024
+
+codecs:
+  # true: body.<JSONPath> references read XML request bodies (application/xml,
+  # text/xml, +xml) as a document. false: an XML body is a missing value.
+  xml: true
+
+runner:
+  # Request files for the runner (the Requests page, janus run and janus
+  # import), relative to this file. A project without this folder serves
+  # exactly as before. It must not overlap fixtures.root or
+  # recording.captures. Flag: --requests.
+  root: ./requests
+  # The runner sends requests anywhere a request file names, so it is only
+  # available on a loopback listener. true lifts that limit.
+  allowNonLoopback: false
+  # Runs in progress at once (1 to 16); one more gets 503 runner-busy.
+  maxActiveRuns: 2
+  # Finished runs kept in memory for the run view (1 to 1000).
+  keepRuns: 50
+  # The bound on each before or after script, in milliseconds (50 to 60000),
+  # and on its heap, in bytes (1 MiB to 512 MiB).
+  scriptTimeoutMs: 1000
+  scriptMemoryBytes: 33554432
+  # The largest import, in bytes (1 MiB to 1 GiB); a zip may expand to four
+  # times this.
+  maxImportBytes: 52428800
+  # PEM files with certificate authorities (or a server's self-signed
+  # certificate) to trust for the runner's Upstream and Record modes and for
+  # recording, besides the platform's, for staging servers with a private CA.
+  # Relative to this file.
+  extraCaCerts: []
+  # true accepts any upstream certificate, unverified, for those same
+  # requests, and Janus warns tls-verification-off. Only for dev, test or
+  # staging backends; prefer extraCaCerts.
+  skipTlsVerify: false

@@ -1,0 +1,524 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": { "description": "JSON Schema reference for editors; ignored by Janus.", "type": "string" },
+    "server": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*|[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*)$",
+          "description": "Address to bind. A non-loopback address is reported as a warning: Janus has no authentication.",
+          "default": "127.0.0.1"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "Port to bind; 0 picks a free port.",
+          "default": 4010
+        },
+        "strictTrailingSlash": {
+          "type": "boolean",
+          "description": "true: \"/a/\" never matches \"/a\". false: exactly one trailing \"/\" is dropped before matching.",
+          "default": true
+        },
+        "autoOptions": {
+          "type": "boolean",
+          "description": "true: an OPTIONS request to a fixture path without an OPTIONS directory gets 204 with Allow. false: it gets 405.",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "fixtures": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Fixture root directory, relative to this file's directory.",
+          "default": "./data"
+        },
+        "watch": {
+          "type": "boolean",
+          "description": "true: watch the fixture root and reload the snapshot when files change. An invalid edit never replaces the served snapshot.",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "onUnknownMethod": {
+      "type": "number",
+      "enum": [405, 404],
+      "description": "When the path exists but the method does not: 405 with Allow, or 404 route-not-found without disclosing methods.",
+      "default": 405
+    },
+    "onNoFixture": {
+      "type": "number",
+      "enum": [404, 501],
+      "description": "When no route matches in the selected scenario: 404 route-not-found, or 501 not-mocked, which cannot be mistaken for an application 404.",
+      "default": 404
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "maxUrlBytes": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 9007199254740991,
+          "description": "Longest request target, in bytes; longer is 414 url-too-long.",
+          "default": 8192
+        },
+        "maxHeaderBytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 9007199254740991,
+          "description": "Largest total request header size, in bytes; larger is 431 headers-too-large.",
+          "default": 16384
+        },
+        "maxBodyBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Largest request body, in bytes; larger is 413 request-too-large.",
+          "default": 1048576
+        },
+        "maxDecodedBodyBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Largest request body after removing its Content-Encoding, in bytes; larger is 413 decoded-body-too-large. At least limits.maxBodyBytes.",
+          "default": 4194304
+        }
+      },
+      "additionalProperties": false
+    },
+    "negotiation": {
+      "type": "object",
+      "properties": {
+        "mediaTypePreference": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[!#$%&'+\\-.^_`|~0-9A-Za-z]+\\/[!#$%&'+\\-.^_`|~0-9A-Za-z]+$" },
+          "description": "Media types to prefer, first first, when Accept ranks several representations equally. Unlisted types follow in lexical order.",
+          "default": []
+        },
+        "onUnusableAccept": {
+          "enum": [400, "any"],
+          "description": "An Accept header with no usable media range: 400 invalid-request, or any to treat it as */*.",
+          "default": 400
+        },
+        "onUnacceptable": {
+          "enum": [406, "ignore"],
+          "description": "No representation matches Accept: 406 not-acceptable, or ignore to serve the first by mediaTypePreference, then lexical order.",
+          "default": 406
+        }
+      },
+      "additionalProperties": false
+    },
+    "diagnostics": {
+      "type": "object",
+      "properties": {
+        "headers": {
+          "type": "boolean",
+          "description": "false removes every X-Mock-* diagnostic header Janus adds. The trace is unaffected.",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "dynamic": {
+      "type": "object",
+      "properties": {
+        "now": {
+          "description": "The instant dynamic values render against, as RFC 3339 with an offset (2026-01-01T00:00:00Z); null uses the wall clock.",
+          "default": null,
+          "type": ["string", "null"]
+        },
+        "clockMode": {
+          "type": "string",
+          "enum": ["frozen", "offset"],
+          "description": "frozen: dynamic.now never moves. offset: it starts at dynamic.now and advances with the wall clock.",
+          "default": "frozen"
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA time zone for dates such as {{$today}}; never the host zone.",
+          "default": "UTC"
+        },
+        "seed": {
+          "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 4294967295 }, { "type": "null" }],
+          "description": "Seed for generated values; null picks one at startup and reports it at /_janus/clock.",
+          "default": null
+        },
+        "strictRefs": {
+          "type": "boolean",
+          "description": "true: a request value a token needs but the request lacks is 500 render-failed instead of null or \"\".",
+          "default": false
+        },
+        "aliases": {
+          "type": "object",
+          "propertyNames": { "type": "string" },
+          "additionalProperties": { "type": "string" },
+          "description": "Custom clock aliases, name: <base><offsets>, e.g. trialEnd: today+30d.",
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "atlas": {
+      "type": "object",
+      "properties": {
+        "resolve": {
+          "type": "boolean",
+          "description": "false disables POST /_janus/resolve, the resolution explorer: it then answers 404.",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "ui": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "false stops serving the Atlas UI at /_janus/ui/; --no-ui does the same.",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "cors": {
+      "type": "object",
+      "properties": {
+        "origins": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Origins whose pages may call the Atlas API across origins, such as http://localhost:5173; [\"*\"] allows any. Empty disables CORS.",
+          "default": []
+        },
+        "maxAge": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400,
+          "description": "How long browsers may cache a preflight, in seconds.",
+          "default": 600
+        },
+        "fixtures": {
+          "type": "object",
+          "properties": {
+            "origins": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Origins whose pages may call the fixture routes across origins; [\"*\"] allows any. Empty disables fixture CORS. Never applies to the Atlas.",
+              "default": []
+            },
+            "credentials": {
+              "type": "boolean",
+              "description": "true lets pages send cookies to the fixture routes and read the answers. Not with [\"*\"].",
+              "default": false
+            },
+            "maxAge": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 86400,
+              "description": "How long browsers may cache a fixture preflight, in seconds.",
+              "default": 600
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "scenarios": {
+      "type": "object",
+      "properties": {
+        "default": {
+          "type": "string",
+          "description": "The scenario a request gets without X-Mock-Scenario or a session pin; it must be a scenario directory. --scenario does the same.",
+          "default": "default"
+        }
+      },
+      "additionalProperties": false
+    },
+    "sessions": {
+      "type": "object",
+      "properties": {
+        "keyFrom": {
+          "maxItems": 8,
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Where a session key comes from when X-Mock-Session is absent: header.<name> or cookie.<name> entries, the first present one hashed into the session ID.",
+          "default": []
+        },
+        "idleTimeout": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400,
+          "description": "Seconds after its last request that a session expires.",
+          "default": 1800
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "description": "Sessions that may exist at once; creating one more is 503 session-limit.",
+          "default": 1000
+        }
+      },
+      "additionalProperties": false
+    },
+    "idempotency": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "false resolves every retried request again instead of replaying the response a session got for its Idempotency-Key.",
+          "default": true
+        },
+        "header": {
+          "type": "string",
+          "description": "The request header carrying the idempotency key. Not X-Mock-*, a hop-by-hop header or Content-Type.",
+          "default": "Idempotency-Key"
+        },
+        "methods": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["POST", "PATCH", "PUT", "DELETE"] },
+          "description": "The methods whose retries are replayed.",
+          "default": ["POST", "PATCH"]
+        },
+        "maxEntries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "description": "Stored responses one session may hold; storing one more drops that session's oldest.",
+          "default": 1000
+        }
+      },
+      "additionalProperties": false
+    },
+    "recording": {
+      "type": "object",
+      "properties": {
+        "endpoints": {
+          "maxItems": 256,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] },
+              "path": { "type": "string", "minLength": 1 },
+              "upstream": { "type": "string", "minLength": 1 }
+            },
+            "required": ["method", "path", "upstream"],
+            "additionalProperties": false
+          },
+          "description": "The requests X-Mock-Record: true may forward: each a method, a path template such as /v1/products/{productId}, and the http or https upstream it is sent to. Empty disables recording.",
+          "default": []
+        },
+        "captures": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where recorded exchanges are written, relative to this file's directory. Never inside fixtures.root; never served.",
+          "default": "./captures"
+        },
+        "allowNonLoopback": {
+          "type": "boolean",
+          "description": "true allows recording on a non-loopback listener: any client that can reach the port can then call every registered upstream.",
+          "default": false
+        },
+        "maxConcurrent": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "description": "Recordings that may be in progress at once; one more is 503 recording-busy.",
+          "default": 4
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 600000,
+          "description": "Milliseconds an upstream has to send its whole response; longer is 504 recording-upstream-timeout.",
+          "default": 30000
+        },
+        "maxResponseBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1073741824,
+          "description": "Largest upstream response body, in bytes; larger is 502 recording-response-too-large.",
+          "default": 10485760
+        }
+      },
+      "additionalProperties": false
+    },
+    "promotion": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["staged", "auto"],
+          "description": "staged keeps captures until someone promotes one; auto promotes each successful capture into its scenario as soon as it is written, pending review.",
+          "default": "staged"
+        }
+      },
+      "additionalProperties": false
+    },
+    "faults": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "false turns off every fault and every delay at once; fault.yaml and latency are still loaded and described.",
+          "default": true
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 3600000,
+          "description": "How long a timeout fault holds a connection before Janus closes it, in milliseconds.",
+          "default": 120000
+        },
+        "maxHeldConnections": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Connections timeout faults may hold at once; one more gets 503 fault-capacity-exceeded.",
+          "default": 128
+        },
+        "latency": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": { "ms": { "type": "integer", "minimum": 0, "maximum": 60000 } },
+                  "required": ["ms"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "min": { "type": "integer", "minimum": 0, "maximum": 60000 },
+                    "max": { "type": "integer", "minimum": 0, "maximum": 60000 }
+                  },
+                  "required": ["min", "max"],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            { "type": "null" }
+          ],
+          "description": "The server-wide delay before the first byte: { ms: N } or { min: A, max: B } in milliseconds, or null for none.",
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "compression": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "false sends every fixture body uncompressed, whatever Accept-Encoding asks for.",
+          "default": true
+        },
+        "encodings": {
+          "minItems": 1,
+          "type": "array",
+          "items": { "type": "string", "enum": ["br", "gzip", "deflate"] },
+          "description": "The codings Janus may use, preferred first when Accept-Encoding ranks them equally.",
+          "default": ["br", "gzip", "deflate"]
+        },
+        "minBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1073741824,
+          "description": "Smallest JSON or text body Janus compresses, in bytes.",
+          "default": 1024
+        }
+      },
+      "additionalProperties": false
+    },
+    "codecs": {
+      "type": "object",
+      "properties": {
+        "xml": {
+          "type": "boolean",
+          "description": "true: body.<JSONPath> references read XML request bodies as a document. false: an XML body is a missing value.",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "runner": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where saved requests, collections and environments live, relative to this file's directory. Never inside fixtures.root or recording.captures.",
+          "default": "./requests"
+        },
+        "allowNonLoopback": {
+          "type": "boolean",
+          "description": "true makes the request runner available on a non-loopback listener: any client that can reach the port can then make Janus send requests anywhere it can reach.",
+          "default": false
+        },
+        "maxActiveRuns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Runs that may be in progress at once; one more is 503 runner-busy.",
+          "default": 2
+        },
+        "keepRuns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Finished runs kept in memory for the Atlas and the UI.",
+          "default": 50
+        },
+        "scriptTimeoutMs": {
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 60000,
+          "description": "Milliseconds one pre-request or post-response script may run; longer fails the step script-timeout.",
+          "default": 1000
+        },
+        "scriptMemoryBytes": {
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 536870912,
+          "description": "Largest heap one script may use, in bytes; more fails the step script-memory.",
+          "default": 33554432
+        },
+        "maxImportBytes": {
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 1073741824,
+          "description": "Largest import, in bytes, across all its files; a zip may expand to four times this.",
+          "default": 52428800
+        },
+        "extraCaCerts": {
+          "maxItems": 64,
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "PEM files of certificate authorities (or self-signed certificates) trusted for runner and recording requests besides the platform's, relative to this file's directory.",
+          "default": []
+        },
+        "skipTlsVerify": {
+          "type": "boolean",
+          "description": "Accept any certificate from the upstream for runner and recording requests, unverified. Only for dev, test or staging backends; Janus warns tls-verification-off.",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "title": "Janus configuration",
+  "description": "Settings for the Janus mock server (janus.config.yaml)."
+}

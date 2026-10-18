@@ -1,0 +1,26 @@
+meta {
+  name: Carts
+  seq: 1
+}
+
+headers {
+  Accept: application/json
+}
+
+auth {
+  mode: apikey
+}
+
+auth:apikey {
+  key: X-Api-Key
+  value: {{process.env.API_KEY}}
+  placement: header
+}
+
+vars:pre-request {
+  currency: EUR
+}
+
+script:post-response {
+  console.log("cart call done");
+}

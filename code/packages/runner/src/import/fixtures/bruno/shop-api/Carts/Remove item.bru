@@ -1,0 +1,16 @@
+meta {
+  name: Remove item
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/v1/carts/:cartId/items/:sku
+  body: none
+  auth: none
+}
+
+params:path {
+  cartId: {{cartId}}
+  sku: {{sku}}
+}

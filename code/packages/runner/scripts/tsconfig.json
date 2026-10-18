@@ -1,0 +1,9 @@
+{
+  // The package's maintenance scripts run on Node (node --import tsx); src keeps its own tsconfig.
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["*.ts"]
+}

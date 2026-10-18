@@ -1,0 +1,8 @@
+# A grandchild: sold out, and the French greeting is gone, so French callers
+# get the neutral greeting.
+description: Sold out, with no French greeting.
+extends: sold-out
+ids:
+  cartId: cart_sold_out_en
+removes:
+  - /v1/greeting/GET/200_[fr].json

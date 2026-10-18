@@ -1,0 +1,21 @@
+opencollection: 1.0.0
+info:
+  name: Shop API (YAML)
+  summary: The shop collection in Bruno's YAML format.
+request:
+  headers:
+    - name: X-Client
+      value: janus-import
+  auth:
+    type: bearer
+    token: '{{token}}'
+  variables:
+    - name: apiVersion
+      value: v2
+  scripts:
+    - type: before-request
+      code: req.setHeader("X-Request-Start", String(Date.now()));
+docs: |-
+  # Shop API
+
+  Imported from Bruno YAML.

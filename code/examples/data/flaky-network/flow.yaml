@@ -1,0 +1,4 @@
+# A child of default on a bad network: every request waits
+# 200 to 800 ms, and payments fail at the transport level.
+description: A slow, unreliable network.
+latency: { min: 200, max: 800 }

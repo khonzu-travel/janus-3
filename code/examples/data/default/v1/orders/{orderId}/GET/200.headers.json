@@ -1,0 +1,5 @@
+{
+  "ETag": "\"{{$uuid}}\"",
+  "Expires": "{{$tomorrow:http}}",
+  "X-Correlation-Id": "{{$header.X-Correlation-Id}}"
+}

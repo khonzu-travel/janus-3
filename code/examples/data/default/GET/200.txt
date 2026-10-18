@@ -1,0 +1,1 @@
+Janus example fixtures. Try GET /v1/products.

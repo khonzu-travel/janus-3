@@ -1,0 +1,10 @@
+# Rules are tried in order; the first whose conditions all hold chooses the
+# response. Without a match, sequence.yaml decides.
+rules:
+  - when: { path.orderId: ord-missing }
+    serve: 404.missing
+  - when: { header.if-none-match: { matchesETag: '"o-v2"' } }
+    serve: 304.fresh
+  # A rule sequence: each session steps through it on its own position.
+  - when: { query.express: "true" }
+    serve: [202.pending, 200.shipped]
