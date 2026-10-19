@@ -439,6 +439,20 @@ describe('Requests page', () => {
     expect(front().getByLabelText<HTMLSelectElement>('Body type').value).toBe('xml');
   });
 
+  it('edits a JSON body in a code editor and lists the variables it reads', async () => {
+    const { user } = renderApp('#/requests?id=checkout%2F010-create-cart');
+    await screen.findByLabelText('URL');
+    await user.click(hotbar().getByRole('button', { name: 'New request' }));
+    await user.click(front().getByRole('tab', { name: /Body/ }));
+    await user.selectOptions(front().getByLabelText('Body type'), 'json');
+    const body = await waitFor(() => front().getByRole('textbox', { name: 'JSON body' }));
+    expect(body.closest('.cm-editor')).not.toBeNull();
+    await user.click(body);
+    await user.paste('{"cart": "{{cartId}}"}');
+    expect(body.textContent).toBe('{"cart": "{{cartId}}"}');
+    expect(front().getByRole('list', { name: 'Variables used' }).textContent).toContain('{{cartId}}');
+  });
+
   it('opens New request as a blank Untitled tab with the previous tab’s headers, and saves it to a collection', async () => {
     const { server, user } = renderApp('#/requests?id=checkout%2F010-create-cart');
     await screen.findByLabelText('URL');

@@ -3,10 +3,14 @@ import type { EditorView } from '@codemirror/view';
 import type { EditorLanguage } from './codeMirror.js';
 import { useEffect, useId, useLayoutEffect, useRef } from 'react';
 
+import { VariableLine } from './fields.js';
+import type { Scopes } from './variables.js';
+
 /**
  * A labelled code editor, JavaScript for the Before and After scripts or
- * JSON for a body: line numbers, bracket matching, undo, Tab and Shift + Tab
- * for indenting.
+ * JSON or text for a body: line numbers, bracket matching, undo, Tab and
+ * Shift + Tab for indenting. Given `scopes`, the variables the text reads show
+ * under it, as under any template field.
  * CodeMirror loads with the first one shown.
  */
 export function CodeEditor({
@@ -16,6 +20,7 @@ export function CodeEditor({
   describedBy,
   language = 'javascript',
   hideLabel = false,
+  scopes = null,
 }: {
   readonly label: string;
   readonly value: string;
@@ -24,6 +29,7 @@ export function CodeEditor({
   readonly language?: EditorLanguage;
   /** The label is for assistive technology only, when a heading beside the editor already says it. */
   readonly hideLabel?: boolean;
+  readonly scopes?: Scopes | null;
 }) {
   const labelId = useId();
   const host = useRef<HTMLDivElement>(null);
@@ -70,6 +76,7 @@ export function CodeEditor({
         ref={host}
         className="min-h-40 overflow-hidden rounded border border-line-strong bg-surface focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent"
       />
+      <VariableLine text={value} scopes={scopes} />
     </div>
   );
 }

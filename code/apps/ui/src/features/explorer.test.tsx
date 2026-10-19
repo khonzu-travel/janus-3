@@ -117,7 +117,8 @@ describe('the explorer', () => {
     await user.click(within(editor).getByLabelText('Send a body'));
     await user.type(within(editor).getByLabelText('Body Content-Type'), 'application/json');
     await user.click(within(editor).getByLabelText('Base64'));
-    await user.type(within(editor).getByLabelText('Body (base64)'), 'e30=');
+    await user.click(within(editor).getByLabelText('Body (base64)'));
+    await user.paste('e30=');
     await user.type(screen.getByLabelText('Render at'), '2026-01-01T00:00:00Z');
     await user.click(within(editor).getByRole('button', { name: 'Explain' }));
     await result();
@@ -580,7 +581,9 @@ describe('Explore editor tabs', () => {
     if (encoding === 'base64') await user.click(within(editor).getByLabelText('Base64'));
     const label = encoding === 'base64' ? 'Body (base64)' : 'Body (text)';
     const payload = encoding === 'base64' ? 'e30=' : 'request-payload';
-    await user.type(within(editor).getByLabelText(label), payload);
+    // The body is a code editor: pasted, as typing there auto-closes brackets.
+    await user.click(within(editor).getByLabelText(label));
+    await user.paste(payload);
     await user.click(
       within(screen.getByRole('toolbar', { name: 'Panel actions' })).getByRole('button', { name: 'New request' }),
     );
@@ -588,7 +591,7 @@ describe('Explore editor tabs', () => {
     await user.click(within(tabs).getByRole('link', { name: /Untitled-1/ }));
     const reopened = await form();
     expect(within(reopened).getByLabelText('Send a body')).toHaveProperty('checked', true);
-    expect(within(reopened).getByLabelText(label)).toHaveProperty('value', payload);
+    expect(within(reopened).getByLabelText(label).textContent).toBe(payload);
     expect(within(reopened).getByLabelText('Body Content-Type')).toHaveProperty('value', 'application/json');
     expect(window.location.hash).not.toContain(payload);
     await result();

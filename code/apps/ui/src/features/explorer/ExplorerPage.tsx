@@ -34,6 +34,7 @@ import { setCurrentHeaders } from '../requests/tabState.js';
 import type { AtlasLayoutContext } from '../../layouts/AtlasLayoutContext.js';
 import { useChangeScenario } from '../../scenarios/ScenarioSelector.js';
 import { HeadersTable } from '../fixtures/Preview.js';
+import { CodeEditor } from '../requests/CodeEditor.js';
 import { BodyView } from '../requests/JsonTree.js';
 import { explain, ExplanationSteps } from './Explanation.js';
 import {
@@ -500,20 +501,14 @@ function Explorer({
                     </label>
                   </fieldset>
                 </div>
-                <div>
-                  <label htmlFor={`${formId}-body`} className={labelClass}>
-                    Body {draft.bodyEncoding === 'base64' ? '(base64)' : '(text)'}
-                  </label>
-                  <textarea
-                    id={`${formId}-body`}
-                    className={`${inputClass} min-h-24`}
-                    value={draft.body}
-                    spellCheck={false}
-                    onChange={(event) => {
-                      update({ body: event.target.value });
-                    }}
-                  />
-                </div>
+                <CodeEditor
+                  label={`Body ${draft.bodyEncoding === 'base64' ? '(base64)' : '(text)'}`}
+                  language={draft.bodyEncoding === 'utf8' && /json/i.test(draft.bodyContentType) ? 'json' : 'text'}
+                  value={draft.body}
+                  onChange={(body) => {
+                    update({ body });
+                  }}
+                />
               </div>
             ) : null}
           </fieldset>

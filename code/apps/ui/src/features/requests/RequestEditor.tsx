@@ -352,10 +352,10 @@ function BodyEditor({
         </select>
       </div>
       {body === undefined ? null : isTextBody(body) ? (
-        <TextArea
+        <CodeEditor
           label={`${BODY_TEXT[body.type]} body`}
+          language={body.type === 'json' ? 'json' : 'text'}
           value={body.text}
-          rows={10}
           scopes={scopes}
           onChange={(text) => {
             onChange({ type: body.type, text });
@@ -400,19 +400,19 @@ function BodyEditor({
         </div>
       ) : (
         <>
-          <TextArea
+          <CodeEditor
             label="GraphQL query"
+            language="text"
             value={body.query}
-            rows={8}
             scopes={scopes}
             onChange={(query) => {
               onChange({ ...body, query });
             }}
           />
-          <TextArea
+          <CodeEditor
             label="GraphQL variables (JSON)"
+            language="json"
             value={body.variables ?? ''}
-            rows={4}
             scopes={scopes}
             onChange={(variables) => {
               const { variables: _old, ...rest } = body;
