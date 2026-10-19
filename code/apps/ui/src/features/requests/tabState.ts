@@ -259,7 +259,51 @@ export function restoreTabs(exists: (kind: 'node' | 'environment', id: string) =
 }
 
 /** Opens a new untitled request after the others, with the headers of the request tab in front. */
-export function openUntitled(form: UntitledTab['form'], parent: string | null, explore = ''): UntitledTab {
+/** The Explore form for an imported request, so Explore shows it too: the URL's path and query, headers and a text body. */
+function exploreDraftOf(request: Pick<RequestDocument, 'method' | 'url' | 'headers' | 'body'>): RequestDraft {
+  let target = request.url;
+  try {
+    const url = new URL(request.url);
+    target = `${url.pathname}${url.search}`;
+  } catch {
+    // Kept as written.
+  }
+  const body = request.body;
+  const text =
+    body === undefined
+      ? null
+      : body.type === 'json' || body.type === 'text' || body.type === 'xml'
+        ? body.text
+        : body.type === 'form'
+          ? new URLSearchParams(body.fields.map((field) => [field.name, field.value])).toString()
+          : null;
+  const contentType: Readonly<Record<string, string>> = {
+    json: 'application/json',
+    xml: 'application/xml',
+    form: 'application/x-www-form-urlencoded',
+    text: 'text/plain',
+  };
+  return {
+    ...EMPTY_DRAFT,
+    method: request.method,
+    target,
+    headers: (request.headers ?? []).map((entry) => headerRow(entry.name, entry.value, entry.disabled !== true)),
+    ...(text === null || body === undefined
+      ? {}
+      : { includeBody: true, body: text, bodyContentType: contentType[body.type] ?? '' }),
+  };
+}
+
+/**
+ * Opens an untitled tab. `request` fills it (a curl command imported) in
+ * place of a blank request with the last tab's headers.
+ */
+export function openUntitled(
+  form: UntitledTab['form'],
+  parent: string | null,
+  explore = '',
+  request?: Pick<RequestDocument, 'method' | 'url' | 'headers' | 'body'>,
+): UntitledTab {
   const number = state.untitled + 1;
   let tab: UntitledTab = {
     kind: 'untitled',
@@ -267,20 +311,28 @@ export function openUntitled(form: UntitledTab['form'], parent: string | null, e
     number,
     form,
     parent,
-    document: {
-      name: untitledName(number),
-      method: 'GET',
-      url: '',
-      ...(state.headers.length === 0 ? {} : { headers: state.headers }),
-    },
+    document:
+      request === undefined
+        ? {
+            name: untitledName(number),
+            method: 'GET',
+            url: '',
+            ...(state.headers.length === 0 ? {} : { headers: state.headers }),
+          }
+        : { name: untitledName(number), ...request },
     explore,
-    exploreDraft: draftFromSearch(new URLSearchParams(explore)) ?? {
-      ...EMPTY_DRAFT,
-      headers: state.headers.map((entry) => headerRow(entry.name, entry.value, entry.disabled !== true)),
-    },
+    exploreDraft:
+      request === undefined
+        ? (draftFromSearch(new URLSearchParams(explore)) ?? {
+            ...EMPTY_DRAFT,
+            headers: state.headers.map((entry) => headerRow(entry.name, entry.value, entry.disabled !== true)),
+          })
+        : exploreDraftOf(request),
     blank: null,
   };
-  if (explore === '') tab = { ...tab, blank: { document: tab.document, exploreDraft: tab.exploreDraft } };
+  if (explore === '' && request === undefined) {
+    tab = { ...tab, blank: { document: tab.document, exploreDraft: tab.exploreDraft } };
+  }
   set({ ...state, untitled: number, tabs: [...state.tabs, tab] });
   return tab;
 }

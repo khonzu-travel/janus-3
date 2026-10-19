@@ -1233,6 +1233,19 @@ janus import ~/Downloads/checkout.postman_collection.json staging.postman_enviro
 janus import ./shop-bruno --into shop
 ```
 
+**A curl command** becomes one request: choose **curl** in the Import
+dialog and paste it, or paste it into a request's URL field. It opens in a
+new untitled tab (or fills the one you pasted into), ready to send or save.
+Both bash quoting (a browser's "Copy as cURL" and most terminals) and
+Windows cmd quoting (`^` escapes) are read. The method, URL, headers
+(`-H`, `-A`, `-e`, `-b`, `-u` as Basic, `--oauth2-bearer`), data (`-d`,
+`--data-raw`, `--data-binary`, `--data-urlencode`, `--json`, with `-G`
+moving it into the query) and form parts (`-F`) carry over. Options that
+only change curl's output or timing (`-s`, `-v`, `-L`, `-o`,
+`--compressed` and the like) are dropped; anything else the request cannot
+hold (`--proxy`, `--cert`, `-k`, data read from a file) is listed before you
+open it.
+
 ### Requests and errors
 
 - `HEAD` uses an explicit `HEAD` fixture, or else the `GET` fixture without a

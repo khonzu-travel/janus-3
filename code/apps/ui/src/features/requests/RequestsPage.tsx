@@ -1020,6 +1020,11 @@ export function RequestsPage() {
                 select(collection);
               });
             }}
+            onOpenRequest={(request) => {
+              const next = new URLSearchParams(search);
+              next.delete('import');
+              void navigate(hrefOf(openUntitled('request', null, '', request), next));
+            }}
           />
         ) : null}
       </div>

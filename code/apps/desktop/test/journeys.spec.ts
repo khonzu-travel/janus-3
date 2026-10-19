@@ -98,7 +98,7 @@ test('2 to 4. a project opens on the Atlas, which has no bridge or way out, and 
 
   // File › Import Collection… opens the Requests page with the import dialog.
   await menu(app, 'shop-mocks', ['File', 'Import Collection…']);
-  await expect(atlas.getByRole('dialog', { name: 'Import a collection' })).toBeVisible();
+  await expect(atlas.getByRole('dialog', { name: 'Import' })).toBeVisible();
   expect(atlas.url()).toContain('#/requests?import=1');
 
   // Server › Configuration… opens the settings as a dialog over the current view; the app has no button for it.

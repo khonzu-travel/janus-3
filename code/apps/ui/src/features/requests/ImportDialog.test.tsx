@@ -26,7 +26,7 @@ it('previews revised files with the same name', async () => {
   });
   render(
     <AtlasProvider client={client} eventSource={null}>
-      <ImportDialog onClose={() => {}} onImported={() => {}} />
+      <ImportDialog onClose={() => {}} onImported={() => {}} onOpenRequest={() => {}} />
     </AtlasProvider>,
   );
   const user = userEvent.setup();

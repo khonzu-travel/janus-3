@@ -181,9 +181,13 @@ export function RequestTree({
           </div>
           {collections.length === 0 ? (
             all.length === 0 ? (
-              <EmptyState title="No collections yet" headingLevel={null}>Create one (key 2), or import one (key 3).</EmptyState>
+              <EmptyState title="No collections yet" headingLevel={null}>
+                Create one (key 2), or import one (key 3).
+              </EmptyState>
             ) : (
-              <EmptyState title="Nothing matches" headingLevel={null}>No request or collection matches this filter.</EmptyState>
+              <EmptyState title="Nothing matches" headingLevel={null}>
+                No request or collection matches this filter.
+              </EmptyState>
             )
           ) : (
             <ul className="min-h-0 flex-1 overflow-y-auto py-1">{collections.map((node) => render(node, 0))}</ul>

@@ -1,4 +1,4 @@
-import { Fragment, useId, useState, type ReactNode } from 'react';
+import { Fragment, useId, useState, type ClipboardEvent, type ReactNode } from 'react';
 
 import type { NameValue } from '../../atlas/runner.js';
 import {
@@ -75,6 +75,7 @@ export function TemplateInput({
   hideLabel = false,
   placeholder,
   labelEnd,
+  onPaste,
 }: {
   readonly label: string;
   readonly value: string;
@@ -84,6 +85,8 @@ export function TemplateInput({
   readonly placeholder?: string;
   /** Beside the label, flush right; the line is then as tall as an icon button. */
   readonly labelEnd?: ReactNode;
+  /** Sees pasted text first; true when it took the paste, so the text is not inserted. */
+  readonly onPaste?: (text: string) => boolean;
 }) {
   const id = useId();
   const labelElement = (
@@ -111,6 +114,13 @@ export function TemplateInput({
         onChange={(event) => {
           onChange(event.target.value);
         }}
+        {...(onPaste === undefined
+          ? {}
+          : {
+              onPaste: (event: ClipboardEvent<HTMLInputElement>) => {
+                if (onPaste(event.clipboardData.getData('text/plain'))) event.preventDefault();
+              },
+            })}
       />
       <VariableLine text={value} scopes={scopes} />
     </div>

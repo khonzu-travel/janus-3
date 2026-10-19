@@ -10,12 +10,15 @@ export function Dialog({
   onClose,
   children,
   wide = false,
+  focus = 'input, select, textarea, button',
 }: {
   readonly title: ReactNode;
   readonly aside?: ReactNode;
   readonly onClose: () => void;
   readonly children: ReactNode;
   readonly wide?: boolean;
+  /** The selector for where focus starts: the first match. */
+  readonly focus?: string;
 }) {
   const titleId = useId();
   const dialog = useRef<HTMLDivElement>(null);
@@ -26,10 +29,12 @@ export function Dialog({
 
   useEffect(() => {
     const previous = document.activeElement;
-    dialog.current?.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
+    dialog.current?.querySelector<HTMLElement>(focus)?.focus();
     return () => {
       if (previous instanceof HTMLElement) previous.focus();
     };
+    // Only where focus starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     const element = dialog.current;

@@ -5,6 +5,8 @@ import { buttonClass, primaryButtonClass } from '../../components/buttonClass.js
 import { ErrorState } from '../../components/states/ErrorState.js';
 import { LoadingState } from '../../components/states/LoadingState.js';
 import { useAtlasSession } from '../../hooks/AtlasSession.js';
+import type { CurlRequest } from './curl.js';
+import { CurlImport } from './CurlImport.js';
 import { Dialog } from './Dialog.js';
 import { inputClass } from './fields.js';
 import { ProblemList } from './RequestWorkspace.js';
@@ -29,18 +31,52 @@ async function base64Of(file: File): Promise<string> {
   return btoa(binary);
 }
 
+type Source = 'collection' | 'curl';
+
+/** Collection or curl, as a pair of toggle buttons. */
+function SourceToggle({ source, onChange }: { readonly source: Source; readonly onChange: (source: Source) => void }) {
+  const option = (value: Source, label: string) => (
+    <button
+      type="button"
+      aria-pressed={source === value}
+      className={`min-h-6 px-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+        source === value ? 'bg-fg text-surface' : 'text-muted hover:bg-hover'
+      }`}
+      onClick={() => {
+        onChange(value);
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div
+      role="group"
+      aria-label="Import from"
+      className="inline-flex overflow-hidden rounded border border-line-strong"
+    >
+      {option('collection', 'Collection')}
+      {option('curl', 'curl')}
+    </div>
+  );
+}
+
 /**
- * The Import dialog: pick files, a folder or a zip; see
+ * The Import dialog. A collection: pick files, a folder or a zip; see
  * what would be created and the report; then Import, or Replace after a
- * confirmation that names the collection.
+ * confirmation that names the collection. Or a curl command, which opens as
+ * an untitled request.
  */
 export function ImportDialog({
   onClose,
   onImported,
+  onOpenRequest,
 }: {
   readonly onClose: () => void;
   readonly onImported: (collection: string) => void;
+  readonly onOpenRequest: (request: CurlRequest) => void;
 }) {
+  const [source, setSource] = useState<Source>('collection');
   const { client } = useAtlasSession();
   const filesId = useId();
   const folderId = useId();
@@ -159,208 +195,222 @@ export function ImportDialog({
   const requests = current?.files.filter((file) => file.kind === 'request') ?? [];
 
   return (
-    <Dialog title="Import a collection" aside="Postman, Bruno, Charles or HAR" onClose={onClose} wide>
-      <div className="grid gap-4 px-4 py-3">
-        <section aria-labelledby={`${filesId}-step1`}>
-          <h3 id={`${filesId}-step1`} className="font-medium">
-            1. Choose what to import
-          </h3>
-          <p className="text-muted">Pick files, a zip, or a folder. The format is detected from the content.</p>
-          <div className="mt-2 flex flex-wrap gap-4">
-            <div>
-              <label htmlFor={filesId} className="block text-muted">
-                Files or a zip
-              </label>
-              <input
-                id={filesId}
-                type="file"
-                multiple
-                onChange={(event) => {
-                  pick(event.target.files);
-                }}
-              />
-            </div>
-            <div>
-              <label htmlFor={folderId} className="block text-muted">
-                A folder
-              </label>
-              <input
-                id={folderId}
-                type="file"
-                // A folder picker: React has no prop for it.
-                {...{ webkitdirectory: '' }}
-                onChange={(event) => {
-                  pick(event.target.files);
-                }}
-              />
-            </div>
-          </div>
-          {reading ? <LoadingState label="Reading the files" /> : null}
-        </section>
-
-        {files === null ? null : (
-          <section aria-labelledby={`${filesId}-step2`}>
-            <h3 id={`${filesId}-step2`} className="font-medium">
-              2. Check the preview
-            </h3>
-            {current === null && failure === null ? <LoadingState label="Converting" /> : null}
-            {current === null ? null : (
-              <div className="mt-2 grid gap-3">
-                <p>
-                  {FORMAT_TEXT[current.format] ?? current.format}: “{current.name}”. {requests.length}{' '}
-                  {requests.length === 1 ? 'request' : 'requests'}, {converted} converted as they are, {noted.length}{' '}
-                  with notes, {skipped.length} skipped.
-                </p>
-                <div className="max-w-sm">
-                  <label htmlFor={intoId} className="block text-muted">
-                    Collection name
-                  </label>
-                  <input
-                    id={intoId}
-                    className={inputClass}
-                    value={into ?? current.collection}
-                    aria-invalid={!intoValid}
-                    onChange={(event) => {
-                      setInto(event.target.value);
-                    }}
-                  />
-                  {intoValid ? (
-                    current.exists ? (
-                      <p className="mt-0.5 text-warn">A collection with this name exists. Importing replaces it.</p>
-                    ) : null
-                  ) : (
-                    <p className="mt-0.5 text-bad">Use lower-case letters, digits and single hyphens.</p>
-                  )}
-                </div>
-                {current.existingEnvironments.length === 0 ? null : (
-                  <p className="text-warn">
-                    {current.existingEnvironments.length === 1 ? 'The environment ' : 'The environments '}
-                    {current.existingEnvironments.map((name, index) => (
-                      <span key={name}>
-                        {index === 0 ? '' : ', '}
-                        <code className="font-mono text-mono">{name}</code>
-                      </span>
-                    ))}{' '}
-                    {current.existingEnvironments.length === 1 ? 'exists' : 'exist'}, shared by every collection.
-                    Importing replaces {current.existingEnvironments.length === 1 ? 'it' : 'them'}.
-                  </p>
-                )}
-                {current.origins.length === 0 ? null : (
-                  <fieldset>
-                    <legend className="text-muted">Origins</legend>
-                    {current.origins.map((entry) => (
-                      <label key={entry.origin} className="flex items-center gap-1.5">
-                        <input
-                          type="checkbox"
-                          checked={!excludedOrigins.has(entry.origin)}
-                          onChange={(event) => {
-                            setExcludedOrigins(toggle(excludedOrigins, entry.origin, event.target.checked));
-                          }}
-                        />
-                        <code className="font-mono text-mono">{entry.origin}</code>
-                        <span className="text-muted">
-                          as <code className="font-mono text-mono">{`{{${entry.variable}}}`}</code>,{' '}
-                          {entry.transactions} {entry.transactions === 1 ? 'transaction' : 'transactions'}
-                        </span>
-                      </label>
-                    ))}
-                    <label className="mt-1 flex items-center gap-1.5">
-                      <input
-                        type="checkbox"
-                        checked={includeStatic}
-                        onChange={(event) => {
-                          setIncludeStatic(event.target.checked);
-                        }}
-                      />
-                      Include static assets (scripts, styles, images, fonts)
-                    </label>
-                  </fieldset>
-                )}
-                {current.transactions.length === 0 ? null : (
-                  <fieldset className="max-h-64 overflow-y-auto rounded border border-line p-2">
-                    <legend className="text-muted">Transactions</legend>
-                    {current.transactions.map((entry) => (
-                      <label key={entry.position} className="flex min-w-0 items-center gap-1.5">
-                        <input
-                          type="checkbox"
-                          checked={!excludedPositions.has(entry.position)}
-                          onChange={(event) => {
-                            setExcludedPositions(toggle(excludedPositions, entry.position, event.target.checked));
-                          }}
-                        />
-                        <span className="font-mono text-mono">{entry.method}</span>
-                        <span className={`truncate font-mono text-mono ${entry.included ? '' : 'text-faint'}`}>
-                          {entry.url}
-                        </span>
-                        {entry.static ? <span className="text-label text-muted">static</span> : null}
-                      </label>
-                    ))}
-                  </fieldset>
-                )}
-                {requests.length === 0 ? null : (
-                  <details>
-                    <summary className="cursor-pointer text-muted">
-                      Files that will be written ({current.files.length})
-                    </summary>
-                    <ul className="mt-1 font-mono text-mono">
-                      {current.files.map((file) => (
-                        <li key={file.path}>{file.path}</li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-                <ReportGroup title="Skipped" items={skipped} />
-                <ReportGroup title="Converted with notes" items={noted} />
-                {current.problems.length === 0 ? null : <ProblemList problems={current.problems} />}
-              </div>
-            )}
-          </section>
-        )}
-        {failure === null ? null : <ErrorState title="The import did not work" error={failure} />}
-        {confirming && current !== null ? (
-          <p role="alert" className="border-l-2 border-warn bg-warn-soft px-3 py-2">
-            {current.exists ? (
-              <>
-                Replace the collection <code className="font-mono text-mono">{into ?? current.collection}</code>? Every
-                file in it is replaced by the imported ones.
-              </>
-            ) : (
-              <>Replace the environments that exist? Their files are replaced by the imported ones.</>
-            )}
-          </p>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <button type="button" className={buttonClass} onClick={onClose}>
-            Cancel
-          </button>
-          {current === null ? null : current.exists || current.existingEnvironments.length > 0 ? (
-            <button
-              type="button"
-              className={primaryButtonClass}
-              disabled={importing || current.problems.length > 0 || requests.length === 0}
-              onClick={() => {
-                if (confirming) void write(true);
-                else setConfirming(true);
-              }}
-            >
-              {confirming
-                ? current.exists
-                  ? `Replace ${into ?? current.collection}`
-                  : 'Replace environments'
-                : 'Replace'}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className={primaryButtonClass}
-              disabled={importing || current.problems.length > 0 || requests.length === 0}
-              onClick={() => void write(false)}
-            >
-              Import
-            </button>
-          )}
-        </div>
+    <Dialog
+      title="Import"
+      aside={source === 'curl' ? 'A request from a curl command' : 'Postman, Bruno, Charles or HAR'}
+      onClose={onClose}
+      wide
+      // The file picker, past the Collection and curl toggle.
+      focus="input"
+    >
+      <div className="px-4 pt-3">
+        <SourceToggle source={source} onChange={setSource} />
       </div>
+      {source === 'curl' ? (
+        <CurlImport onClose={onClose} onOpen={onOpenRequest} />
+      ) : (
+        <div className="grid gap-4 px-4 py-3">
+          <section aria-labelledby={`${filesId}-step1`}>
+            <h3 id={`${filesId}-step1`} className="font-medium">
+              1. Choose what to import
+            </h3>
+            <p className="text-muted">Pick files, a zip, or a folder. The format is detected from the content.</p>
+            <div className="mt-2 flex flex-wrap gap-4">
+              <div>
+                <label htmlFor={filesId} className="block text-muted">
+                  Files or a zip
+                </label>
+                <input
+                  id={filesId}
+                  type="file"
+                  multiple
+                  onChange={(event) => {
+                    pick(event.target.files);
+                  }}
+                />
+              </div>
+              <div>
+                <label htmlFor={folderId} className="block text-muted">
+                  A folder
+                </label>
+                <input
+                  id={folderId}
+                  type="file"
+                  // A folder picker: React has no prop for it.
+                  {...{ webkitdirectory: '' }}
+                  onChange={(event) => {
+                    pick(event.target.files);
+                  }}
+                />
+              </div>
+            </div>
+            {reading ? <LoadingState label="Reading the files" /> : null}
+          </section>
+
+          {files === null ? null : (
+            <section aria-labelledby={`${filesId}-step2`}>
+              <h3 id={`${filesId}-step2`} className="font-medium">
+                2. Check the preview
+              </h3>
+              {current === null && failure === null ? <LoadingState label="Converting" /> : null}
+              {current === null ? null : (
+                <div className="mt-2 grid gap-3">
+                  <p>
+                    {FORMAT_TEXT[current.format] ?? current.format}: “{current.name}”. {requests.length}{' '}
+                    {requests.length === 1 ? 'request' : 'requests'}, {converted} converted as they are, {noted.length}{' '}
+                    with notes, {skipped.length} skipped.
+                  </p>
+                  <div className="max-w-sm">
+                    <label htmlFor={intoId} className="block text-muted">
+                      Collection name
+                    </label>
+                    <input
+                      id={intoId}
+                      className={inputClass}
+                      value={into ?? current.collection}
+                      aria-invalid={!intoValid}
+                      onChange={(event) => {
+                        setInto(event.target.value);
+                      }}
+                    />
+                    {intoValid ? (
+                      current.exists ? (
+                        <p className="mt-0.5 text-warn">A collection with this name exists. Importing replaces it.</p>
+                      ) : null
+                    ) : (
+                      <p className="mt-0.5 text-bad">Use lower-case letters, digits and single hyphens.</p>
+                    )}
+                  </div>
+                  {current.existingEnvironments.length === 0 ? null : (
+                    <p className="text-warn">
+                      {current.existingEnvironments.length === 1 ? 'The environment ' : 'The environments '}
+                      {current.existingEnvironments.map((name, index) => (
+                        <span key={name}>
+                          {index === 0 ? '' : ', '}
+                          <code className="font-mono text-mono">{name}</code>
+                        </span>
+                      ))}{' '}
+                      {current.existingEnvironments.length === 1 ? 'exists' : 'exist'}, shared by every collection.
+                      Importing replaces {current.existingEnvironments.length === 1 ? 'it' : 'them'}.
+                    </p>
+                  )}
+                  {current.origins.length === 0 ? null : (
+                    <fieldset>
+                      <legend className="text-muted">Origins</legend>
+                      {current.origins.map((entry) => (
+                        <label key={entry.origin} className="flex items-center gap-1.5">
+                          <input
+                            type="checkbox"
+                            checked={!excludedOrigins.has(entry.origin)}
+                            onChange={(event) => {
+                              setExcludedOrigins(toggle(excludedOrigins, entry.origin, event.target.checked));
+                            }}
+                          />
+                          <code className="font-mono text-mono">{entry.origin}</code>
+                          <span className="text-muted">
+                            as <code className="font-mono text-mono">{`{{${entry.variable}}}`}</code>,{' '}
+                            {entry.transactions} {entry.transactions === 1 ? 'transaction' : 'transactions'}
+                          </span>
+                        </label>
+                      ))}
+                      <label className="mt-1 flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={includeStatic}
+                          onChange={(event) => {
+                            setIncludeStatic(event.target.checked);
+                          }}
+                        />
+                        Include static assets (scripts, styles, images, fonts)
+                      </label>
+                    </fieldset>
+                  )}
+                  {current.transactions.length === 0 ? null : (
+                    <fieldset className="max-h-64 overflow-y-auto rounded border border-line p-2">
+                      <legend className="text-muted">Transactions</legend>
+                      {current.transactions.map((entry) => (
+                        <label key={entry.position} className="flex min-w-0 items-center gap-1.5">
+                          <input
+                            type="checkbox"
+                            checked={!excludedPositions.has(entry.position)}
+                            onChange={(event) => {
+                              setExcludedPositions(toggle(excludedPositions, entry.position, event.target.checked));
+                            }}
+                          />
+                          <span className="font-mono text-mono">{entry.method}</span>
+                          <span className={`truncate font-mono text-mono ${entry.included ? '' : 'text-faint'}`}>
+                            {entry.url}
+                          </span>
+                          {entry.static ? <span className="text-label text-muted">static</span> : null}
+                        </label>
+                      ))}
+                    </fieldset>
+                  )}
+                  {requests.length === 0 ? null : (
+                    <details>
+                      <summary className="cursor-pointer text-muted">
+                        Files that will be written ({current.files.length})
+                      </summary>
+                      <ul className="mt-1 font-mono text-mono">
+                        {current.files.map((file) => (
+                          <li key={file.path}>{file.path}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                  <ReportGroup title="Skipped" items={skipped} />
+                  <ReportGroup title="Converted with notes" items={noted} />
+                  {current.problems.length === 0 ? null : <ProblemList problems={current.problems} />}
+                </div>
+              )}
+            </section>
+          )}
+          {failure === null ? null : <ErrorState title="The import did not work" error={failure} />}
+          {confirming && current !== null ? (
+            <p role="alert" className="border-l-2 border-warn bg-warn-soft px-3 py-2">
+              {current.exists ? (
+                <>
+                  Replace the collection <code className="font-mono text-mono">{into ?? current.collection}</code>?
+                  Every file in it is replaced by the imported ones.
+                </>
+              ) : (
+                <>Replace the environments that exist? Their files are replaced by the imported ones.</>
+              )}
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <button type="button" className={buttonClass} onClick={onClose}>
+              Cancel
+            </button>
+            {current === null ? null : current.exists || current.existingEnvironments.length > 0 ? (
+              <button
+                type="button"
+                className={primaryButtonClass}
+                disabled={importing || current.problems.length > 0 || requests.length === 0}
+                onClick={() => {
+                  if (confirming) void write(true);
+                  else setConfirming(true);
+                }}
+              >
+                {confirming
+                  ? current.exists
+                    ? `Replace ${into ?? current.collection}`
+                    : 'Replace environments'
+                  : 'Replace'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={primaryButtonClass}
+                disabled={importing || current.problems.length > 0 || requests.length === 0}
+                onClick={() => void write(false)}
+              >
+                Import
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 }

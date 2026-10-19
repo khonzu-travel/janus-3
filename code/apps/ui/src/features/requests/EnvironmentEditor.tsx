@@ -73,7 +73,9 @@ export function EnvironmentList({
   return (
     <nav aria-label="Environments" className="flex min-h-0 flex-col">
       {environments.length === 0 ? (
-        <EmptyState title="No environments yet" headingLevel={null}>Environments you create or import show here.</EmptyState>
+        <EmptyState title="No environments yet" headingLevel={null}>
+          Environments you create or import show here.
+        </EmptyState>
       ) : (
         <ul className="min-h-0 flex-1 overflow-y-auto py-1">
           {environments.map((entry) => (

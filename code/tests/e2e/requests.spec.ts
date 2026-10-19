@@ -142,7 +142,7 @@ test('imports a Postman collection, saves a value as a variable, and runs it in 
 
   // 2. Import the collection and its staging environment.
   await actions.getByRole('button', { name: 'Import' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Import a collection' });
+  const dialog = page.getByRole('dialog', { name: 'Import' });
   await dialog.getByLabel('Files or a zip').setInputFiles([
     {
       name: 'checkout.postman_collection.json',
@@ -387,11 +387,44 @@ test('works from the keyboard', async ({ page }) => {
   const importButton = page.getByRole('toolbar', { name: 'Panel actions' }).getByRole('button', { name: 'Import' });
   await importButton.focus();
   await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog', { name: 'Import a collection' });
+  const dialog = page.getByRole('dialog', { name: 'Import' });
   await expect(dialog.getByLabel('Files or a zip')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(importButton).toBeFocused();
+});
+
+test('imports a request from a curl command, in the Import dialog or pasted into the URL', async ({ page }, info) => {
+  await page.goto(`${janus.url}/_janus/ui/#/requests?import=1`);
+  const dialog = page.getByRole('dialog', { name: 'Import' });
+  await dialog.getByRole('button', { name: 'curl', exact: true }).click();
+  const box = dialog.getByLabel('curl command');
+  await expect(box).toBeFocused();
+  await box.fill(
+    `curl '${upstreamUrl}/v1/carts' -H 'content-type: application/json' --data-raw '{"sku":"A-1"}' --proxy http://p.test:3128`,
+  );
+  await expect(dialog.getByText('Left out, as a request cannot hold them: --proxy.')).toBeVisible();
+  await audit(page, info, 'mouse', 'curl import');
+  await dialog.getByRole('button', { name: 'Open' }).click();
+  await expect(dialog).toBeHidden();
+  const editor = frontEditor(page);
+  await expect(editor.getByLabel('Method')).toHaveValue('POST');
+  await expect(editor.getByLabel('URL', { exact: true })).toHaveValue(`${upstreamUrl}/v1/carts`);
+
+  // A whole command pasted into the URL fills the request in the same way. Only Chromium builds a paste event with text.
+  if (info.project.name !== 'chromium') return;
+  await page.getByRole('button', { name: 'New request' }).first().click();
+  const url = frontEditor(page).getByLabel('URL', { exact: true });
+  await url.focus();
+  const command = `curl -X PUT ${upstreamUrl}/v1/carts/7 -k`;
+  await page.evaluate(`(() => {
+    const data = new DataTransfer();
+    data.setData('text/plain', ${JSON.stringify(command)});
+    document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  })()`);
+  await expect(url).toHaveValue(`${upstreamUrl}/v1/carts/7`);
+  await expect(frontEditor(page).getByLabel('Method')).toHaveValue('PUT');
+  await expect(frontEditor(page).getByText(/runner\.skipTlsVerify/)).toBeVisible();
 });
 
 // Last, since the Bruno collection replaces the shared staging environment the tests above use.
@@ -400,7 +433,7 @@ test('imports a Bruno collection from a folder and a HAR file, and shows their r
   const actions = page.getByRole('toolbar', { name: 'Panel actions' });
   const fixtures = join(import.meta.dirname, '..', '..', 'packages', 'runner', 'src', 'import', 'fixtures');
   await page.goto(`${janus.url}/_janus/ui/#/requests?import=1`);
-  const bruno = page.getByRole('dialog', { name: 'Import a collection' });
+  const bruno = page.getByRole('dialog', { name: 'Import' });
   await bruno.getByLabel('A folder').setInputFiles(join(fixtures, 'bruno', 'shop-api'));
   await expect(bruno.getByText(/^Bruno collection: “Shop API”/)).toBeVisible();
   await expect(bruno.getByText(/skipped/).first()).toBeVisible();
@@ -414,7 +447,7 @@ test('imports a Bruno collection from a folder and a HAR file, and shows their r
   ).toBeVisible();
 
   await actions.getByRole('button', { name: 'Import' }).click();
-  const har = page.getByRole('dialog', { name: 'Import a collection' });
+  const har = page.getByRole('dialog', { name: 'Import' });
   await har.getByLabel('Files or a zip').setInputFiles(join(fixtures, 'har', 'chrome.har'));
   await expect(har.getByText(/^HAR file: “chrome”/)).toBeVisible();
   await har.getByRole('button', { name: 'Import', exact: true }).click();

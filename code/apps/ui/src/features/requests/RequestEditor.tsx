@@ -16,6 +16,7 @@ import { Tabs } from '../../components/Tabs.js';
 import type { AtlasLayoutContext } from '../../layouts/AtlasLayoutContext.js';
 import { useChangeScenario } from '../../scenarios/ScenarioSelector.js';
 import { CodeEditor } from './CodeEditor.js';
+import { looksLikeCurl, parseCurl } from './curl.js';
 import { ExtractTable } from './ExtractTable.js';
 import { useScriptHelp } from './storedFlag.js';
 import {
@@ -42,7 +43,7 @@ const BODY_CHOICES: readonly (BodyType | 'none')[] = [
   ...BODY_TYPES.filter((type) => type !== 'json' && type !== 'graphql'),
 ];
 
-const BODY_TEXT: Readonly<Record<BodyType | 'none', string>> = {
+export const BODY_TEXT: Readonly<Record<BodyType | 'none', string>> = {
   none: 'No body',
   json: 'JSON',
   text: 'Text',
@@ -94,6 +95,8 @@ export function RequestEditor({
   readonly tools?: ReactNode;
 }) {
   const [section, setSection] = useState<Section>('params');
+  /** What a curl command pasted into the URL left out, or why it could not be read; cleared by the next URL edit. */
+  const [curlNotes, setCurlNotes] = useState<readonly string[]>([]);
   const { health } = useOutletContext<AtlasLayoutContext>();
   const changeScenario = useChangeScenario(health);
   const methodId = useId();
@@ -149,9 +152,30 @@ export function RequestEditor({
               placeholder="{{baseUrl}}/v1/carts/:cartId"
               labelEnd={tools === undefined ? undefined : <div className={lineButtonsClass}>{tools}</div>}
               onChange={(url) => {
+                setCurlNotes([]);
                 onChange({ ...draft, url });
               }}
+              onPaste={(text) => {
+                // A whole curl command pasted here fills the request: method, URL, headers and body.
+                if (!looksLikeCurl(text)) return false;
+                const result = parseCurl(text);
+                if (!result.ok) {
+                  setCurlNotes([`The curl command could not be read: ${result.message}.`]);
+                  return true;
+                }
+                const { pathParams: _params, headers: _headers, body: _body, ...rest } = draft;
+                setCurlNotes(result.notes);
+                onChange({ ...rest, ...result.request });
+                return true;
+              }}
             />
+            {curlNotes.length === 0 ? null : (
+              <ul aria-label="Notes on the pasted curl command" className="mt-0.5 text-warn">
+                {curlNotes.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+            )}
           </div>
           {actions === undefined ? null : (
             <div>
