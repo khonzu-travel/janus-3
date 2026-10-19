@@ -705,6 +705,32 @@ scripts:
     expect(scripts).toHaveBeenCalledTimes(1);
   });
 
+  it('carries a whole text response past 64 KiB but cuts a binary one', async () => {
+    const items = Array.from({ length: 5000 }, (_, index) => ({ id: index, name: `item-${String(index)}` }));
+    const binary = new Uint8Array(70 * 1024).fill(0xff);
+    let call = 0;
+    const h = harness(() =>
+      ++call === 1
+        ? json(200, items)
+        : { kind: 'response', status: 200, headers: [['Content-Type', 'image/png']], body: binary, timeMs: 3 },
+    );
+    const runner = createRunner(h.ports, () => SETTINGS, noScripts);
+    for (const expected of ['utf8', 'base64']) {
+      const started = runner.start(
+        { target: { kind: 'node', id: 'api' }, environment: null, mode: 'upstream', scenario: null, vars: {} },
+        requests,
+      );
+      if (!started.ok) throw new Error(started.message);
+      const body = (await started.done).steps[0]?.response?.body;
+      if (expected === 'utf8') {
+        expect(body).toMatchObject({ encoding: 'utf8', truncated: false });
+        expect(body?.state === 'available' && JSON.parse(body.value)).toEqual(items);
+      } else {
+        expect(body).toMatchObject({ encoding: 'base64', truncated: true, byteLength: 70 * 1024 });
+      }
+    }
+  });
+
   it('explains without sending, extracting or testing', async () => {
     const h = harness(() => json(200, {}));
     const scripts = vi.fn(() => Promise.resolve({ failure: null, tests: [], console: [] }));

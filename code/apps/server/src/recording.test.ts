@@ -930,14 +930,14 @@ describe('recording at startup', () => {
     expect(allowed.stdout()).toContain('[recording-exposed]');
   });
 
-  it('warns tls-verification-off when runner.skipTlsVerify is on', async () => {
+  it('starts quietly when runner.skipTlsVerify is on', async () => {
     await writeTree(root, {
       ...prefixed('data', TREE),
       'janus.config.yaml': `${config()}runner:\n  skipTlsVerify: true\n`,
     });
     const io = environment();
     expect(await main(['validate'], io.env)).toBe(0);
-    expect(io.stdout()).toContain('[tls-verification-off]');
+    expect(io.stdout()).not.toContain('skipTlsVerify');
   });
 
   it('needs nothing from a configuration without registrations', async () => {

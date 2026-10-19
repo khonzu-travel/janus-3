@@ -115,7 +115,6 @@ export type StartupWarningCode =
   | 'cors-header-ignored'
   // Request runner
   | 'runner-exposed'
-  | 'tls-verification-off'
   | 'requests-unknown-file'
   // Shared environments
   | 'requests-collection-environments'

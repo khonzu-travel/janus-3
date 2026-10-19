@@ -1005,8 +1005,7 @@ untitled requests, and every runner route answers `404`.
 
 An upstream with a self-signed certificate or a private CA is trusted by
 listing its PEM file in `runner.extraCaCerts`. `runner.skipTlsVerify: true`
-instead accepts any certificate, unverified, and Janus warns
-`tls-verification-off`. Both apply to the runner's Upstream and Record modes,
+instead accepts any certificate, unverified. Both apply to the runner's Upstream and Record modes,
 `janus run` and recording.
 
 Record mode replaces a request's `Accept-Encoding` with `identity`, so each
@@ -1362,7 +1361,8 @@ allowMissingContentType }` from `accepts.yaml`, or `null`.
   `404 route-not-found`.
 - **Previews** show JSON, YAML, XML, `+json`/`+xml` and `text/*` bodies that
   are valid UTF-8 as `utf8`, everything else as `base64`, cut at 64 KiB (`truncated: true`, with the full
-  `byteLength`). Bodyless statuses have `{"state":"unavailable","reason":"bodyless"}`;
+  `byteLength`). Request runner steps carry text bodies whole; only their
+  `base64` bodies are cut. Bodyless statuses have `{"state":"unavailable","reason":"bodyless"}`;
   an empty body is an available, empty preview.
 - **File paths**: Atlas never reports them.
 - **Dynamic values**: a fixture's `tokens` list each token's `location`

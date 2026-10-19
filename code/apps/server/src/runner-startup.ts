@@ -21,7 +21,7 @@ export interface RunnerStartup {
 /**
  * The runner's startup checks: the request tree
  * and its problems, `requests-overlap`, `runner-invalid-ca`,
- * `runner-exposed` and `tls-verification-off`. A project with no requests folder has an empty tree and
+ * and `runner-exposed`. A project with no requests folder has an empty tree and
  * no problems.
  *
  * `captures` is set when recording did not already check the captures
@@ -100,15 +100,6 @@ export async function checkRunner(
       continue;
     }
     extraCaCerts.push(...blocks);
-  }
-
-  if (values.runner.skipTlsVerify) {
-    warnings.push({
-      code: 'tls-verification-off',
-      ...where('runner.skipTlsVerify'),
-      message:
-        'runner.skipTlsVerify is on: runner and recording requests accept any upstream certificate, so use it only with dev, test or staging backends',
-    });
   }
 
   const available = loopback || values.runner.allowNonLoopback;

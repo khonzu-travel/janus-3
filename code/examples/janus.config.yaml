@@ -238,6 +238,5 @@ runner:
   # Relative to this file.
   extraCaCerts: []
   # true accepts any upstream certificate, unverified, for those same
-  # requests, and Janus warns tls-verification-off. Only for dev, test or
-  # staging backends; prefer extraCaCerts.
+  # requests. Only for dev, test or staging backends; prefer extraCaCerts.
   skipTlsVerify: false

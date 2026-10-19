@@ -665,12 +665,18 @@ export function projectPreview(response: StoredResponse): AtlasPreview {
   return previewBody(response.body, response.mediaType);
 }
 
-/** The preview of any body, textual by `mediaType`; null is bodyless. */
-export function previewBody(body: Uint8Array | null, mediaType: string | null): AtlasPreview {
+/**
+ * The preview of any body, textual by `mediaType`; null is bodyless. A text
+ * preview is cut at `textLimit` bytes, a base64 one always at `PREVIEW_LIMIT`.
+ */
+export function previewBody(
+  body: Uint8Array | null,
+  mediaType: string | null,
+  textLimit: number = PREVIEW_LIMIT,
+): AtlasPreview {
   if (body === null) return { state: 'unavailable', reason: 'bodyless' };
-  const truncated = body.length > PREVIEW_LIMIT;
   if (isTextual(mediaType ?? undefined) && decodeUtf8(body) !== null) {
-    let end = Math.min(body.length, PREVIEW_LIMIT);
+    let end = Math.min(body.length, textLimit);
     // Back up to the start of a character so no partial sequence is shown.
     while (end > 0 && end < body.length && ((body[end] ?? 0) & 0xc0) === 0x80) end--;
     return {
@@ -678,7 +684,7 @@ export function previewBody(body: Uint8Array | null, mediaType: string | null): 
       encoding: 'utf8',
       value: decodeUtf8(body.subarray(0, end)) ?? '',
       byteLength: body.length,
-      truncated,
+      truncated: body.length > textLimit,
     };
   }
   return {
@@ -686,7 +692,7 @@ export function previewBody(body: Uint8Array | null, mediaType: string | null): 
     encoding: 'base64',
     value: toBase64(body.subarray(0, PREVIEW_LIMIT)),
     byteLength: body.length,
-    truncated,
+    truncated: body.length > PREVIEW_LIMIT,
   };
 }
 

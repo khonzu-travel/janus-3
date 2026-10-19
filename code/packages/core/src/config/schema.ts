@@ -783,7 +783,7 @@ export const SETTINGS: Readonly<Record<SettingKey, SettingSpec>> = {
   'runner.skipTlsVerify': {
     schema: z.boolean().meta({
       description:
-        'Accept any certificate from the upstream for runner and recording requests, unverified. Only for dev, test or staging backends; Janus warns tls-verification-off.',
+        'Accept any certificate from the upstream for runner and recording requests, unverified. Only for dev, test or staging backends.',
       default: CONFIG_DEFAULTS.runner.skipTlsVerify,
     }),
     expected: 'true or false',

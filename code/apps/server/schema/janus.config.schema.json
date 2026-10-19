@@ -511,7 +511,7 @@
         },
         "skipTlsVerify": {
           "type": "boolean",
-          "description": "Accept any certificate from the upstream for runner and recording requests, unverified. Only for dev, test or staging backends; Janus warns tls-verification-off.",
+          "description": "Accept any certificate from the upstream for runner and recording requests, unverified. Only for dev, test or staging backends.",
           "default": false
         }
       },

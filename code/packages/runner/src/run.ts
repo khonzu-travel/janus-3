@@ -789,12 +789,18 @@ function mediaTypeOf(headers: readonly HeaderLine[]): string | null {
   return parsed === null ? null : type;
 }
 
+/**
+ * Steps carry whole text bodies, already bounded by the send limits, so the
+ * Requests tab can show and tree a large response; binary stays a preview.
+ */
+const WHOLE_TEXT = Number.POSITIVE_INFINITY;
+
 function describeSent(request: SendRequest): StepSent {
   return {
     method: request.method,
     url: request.url,
     headers: headerList(request.headers),
-    body: previewBody(request.body, mediaTypeOf(request.headers)),
+    body: previewBody(request.body, mediaTypeOf(request.headers), WHOLE_TEXT),
   };
 }
 
@@ -802,7 +808,7 @@ function describeReceived(response: ReceivedResponse): StepReceived {
   return {
     status: response.status,
     headers: headerList(response.headers),
-    body: previewBody(response.body.length === 0 ? null : response.body, mediaTypeOf(response.headers)),
+    body: previewBody(response.body.length === 0 ? null : response.body, mediaTypeOf(response.headers), WHOLE_TEXT),
     timeMs: response.timeMs,
   };
 }

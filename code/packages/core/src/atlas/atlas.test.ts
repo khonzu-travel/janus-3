@@ -5,7 +5,7 @@ import { createEngine } from '../create-engine.js';
 import { buildSnapshot } from '../fixtures/build.js';
 import type { Engine } from '../types/index.js';
 import { endpointId, fixtureId } from '../ids.js';
-import { PREVIEW_LIMIT } from './atlas.js';
+import { PREVIEW_LIMIT, previewBody } from './atlas.js';
 import type { AtlasEndpoint, AtlasFixture, AtlasLookup } from './types.js';
 
 const TOKEN = 'example-token-4b1d';
@@ -252,6 +252,18 @@ describe('engine.atlas', () => {
       expect(preview).toMatchObject({ encoding: 'base64', truncated: true, byteLength: PREVIEW_LIMIT + 10 });
       const value = preview.state === 'available' ? preview.value : '';
       expect(atob(value)).toHaveLength(PREVIEW_LIMIT);
+    });
+
+    it('cuts text at a given limit and keeps base64 at 64 KiB', () => {
+      const text = new TextEncoder().encode('y'.repeat(PREVIEW_LIMIT * 2));
+      expect(previewBody(text, 'text/plain', Number.POSITIVE_INFINITY)).toMatchObject({
+        encoding: 'utf8',
+        truncated: false,
+        byteLength: PREVIEW_LIMIT * 2,
+      });
+      expect(previewBody(text, 'text/plain', 10)).toMatchObject({ value: 'y'.repeat(10), truncated: true });
+      const bytes = new Uint8Array(PREVIEW_LIMIT + 1).fill(0xff);
+      expect(previewBody(bytes, 'image/png', Number.POSITIVE_INFINITY)).toMatchObject({ truncated: true });
     });
 
     it('keeps a body of exactly 64 KiB whole', () => {
