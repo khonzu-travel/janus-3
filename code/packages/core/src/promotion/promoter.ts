@@ -121,6 +121,8 @@ export type AutoOutcome = 'promoted' | 'skipped' | 'failed';
 
 /** Writes reached from `POST /_janus/promotions` and `POST /_janus/promotions/review`. */
 export interface EnginePromotions {
+  /** The largest `POST /_janus/promotions` body, which carries an edited response. */
+  readonly bodyLimit: number;
   promote(headers: HeaderMap, body: Uint8Array | null, signal?: AbortSignal): Promise<PromotionAnswer>;
   review(headers: HeaderMap, body: Uint8Array | null): Promise<PromotionAnswer>;
   /**
@@ -150,6 +152,8 @@ export interface PromoterOptions {
   readonly clock: () => number;
   /** `scenarios.default`: the parent of a created scenario that names none. */
   readonly defaultScenario: () => string;
+  /** The largest promotion body; see `promotionBodyLimit`. */
+  readonly bodyLimit: number;
 }
 
 const NEVER_ABORTED: AbortSignal = new AbortController().signal;
@@ -340,6 +344,7 @@ export function createPromoter(options: PromoterOptions): Promoter {
 
   return {
     available,
+    bodyLimit: options.bodyLimit,
     createScenario: async (headers, body, signal) => {
       // It writes through promotion's fixture writer, so it is gated and refused as promotion is.
       if (!available) return unavailable('Creating a scenario');
@@ -361,7 +366,7 @@ export function createPromoter(options: PromoterOptions): Promoter {
       if (!available) return unavailable();
       let request: PromotionRequest;
       try {
-        request = parsePromotionRequest(headers, body);
+        request = parsePromotionRequest(headers, body, options.bodyLimit);
       } catch (error) {
         return answerError(error);
       }

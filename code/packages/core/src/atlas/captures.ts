@@ -318,7 +318,8 @@ function requestPart(document: Readonly<Record<string, unknown>>): AtlasCaptureD
     ...(typeof url === 'string' ? { url } : {}),
     params: paramList,
     headers: lines,
-    body: previewBody(bytes, contentType),
+    // A text body is shown whole; it is bounded by limits.maxBodyBytes already.
+    body: previewBody(bytes, contentType, Number.POSITIVE_INFINITY),
   });
 }
 
@@ -345,7 +346,12 @@ function responsePart(
     status,
     fileName,
     headers,
-    body: previewBody(parsed.kind === 'response' && parsed.mediaType === null ? null : bytes, mediaType),
+    // A text body is shown whole; it is bounded by recording.maxResponseBytes already.
+    body: previewBody(
+      parsed.kind === 'response' && parsed.mediaType === null ? null : bytes,
+      mediaType,
+      Number.POSITIVE_INFINITY,
+    ),
     modified: typeof digest === 'string' && digest !== captureDigest(bytes),
   });
 }

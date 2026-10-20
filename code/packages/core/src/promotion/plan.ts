@@ -581,7 +581,11 @@ function invalidTree(
   );
 }
 
-/** A planned file's dry-run preview. */
+/** A planned file's dry-run preview; a text file is shown whole, as its capture is. */
 export function plannedPreview(file: PlannedFile): AtlasPreview {
-  return previewBody(file.role === 'response' && file.mediaType === null ? null : file.bytes, file.mediaType);
+  return previewBody(
+    file.role === 'response' && file.mediaType === null ? null : file.bytes,
+    file.mediaType,
+    Number.POSITIVE_INFINITY,
+  );
 }

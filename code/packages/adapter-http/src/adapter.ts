@@ -268,11 +268,15 @@ export function createHttpAdapter(options: HttpAdapterOptions): FastifyInstance 
     const isEnvelope = isAtlas && method === 'POST' && atlasRoute(normalized.segments, atlasContext) === 'resolve';
     // Imports are bounded by runner.maxImportBytes, decoded; base64 adds a third.
     const isImport = isAtlas && method === 'POST' && atlasRoute(normalized.segments, atlasContext) === 'runner:imports';
+    // A promotion may carry an edited response as large as a captured one.
+    const isPromotion = isAtlas && method === 'POST' && atlasRoute(normalized.segments, atlasContext) === 'promotions';
     const bodyLimit = isEnvelope
       ? envelopeLimit(limits.maxBodyBytes)
       : isImport
         ? Math.ceil(((options.runner?.maxImportBytes ?? 0) * 4) / 3) + ENVELOPE_OVERHEAD_BYTES
-        : limits.maxBodyBytes;
+        : isPromotion
+          ? Math.max(limits.maxBodyBytes, engine.promotions.bodyLimit)
+          : limits.maxBodyBytes;
     const headDescription = (): RequestDescription => ({
       method: request.raw.method ?? request.method,
       target,

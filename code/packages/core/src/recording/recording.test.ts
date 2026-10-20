@@ -1044,6 +1044,18 @@ describe('capture projections', () => {
 
     const edited = new Map(files).set('402.json', utf8Encode('{"b":3}'));
     expect(projectCaptureDetail('payment-declined', entry, edited).response).toMatchObject({ modified: true });
+    // A text response is shown whole, past the 64 KiB a fixture preview stops at.
+    const large = `{"b":"${'x'.repeat(70 * 1024)}"}`;
+    expect(
+      projectCaptureDetail('payment-declined', entry, new Map(files).set('402.json', utf8Encode(large))).response,
+    ).toMatchObject({ body: { encoding: 'utf8', value: large, truncated: false } });
+    const request = JSON.stringify({
+      ...JSON.parse(new TextDecoder().decode(files.get('request.json') ?? new Uint8Array())),
+      body: { encoding: 'utf8', data: large },
+    });
+    expect(
+      projectCaptureDetail('payment-declined', entry, new Map(files).set('request.json', utf8Encode(request))).request,
+    ).toMatchObject({ body: { encoding: 'utf8', value: large, truncated: false } });
     const broken = new Map(files).set('request.json', utf8Encode('{')).set('402.meta.json', null);
     broken.delete('402.json');
     const partial = projectCaptureDetail('payment-declined', entry, broken);

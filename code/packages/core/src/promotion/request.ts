@@ -6,6 +6,14 @@ import { PromotionError } from './errors.js';
 /** Largest promotion or review body. */
 export const PROMOTION_BODY_LIMIT = 64 * 1024;
 
+/**
+ * Largest promotion body: an edited response may be as large as a captured
+ * one, `recording.maxResponseBytes`, and gets twice that for JSON escapes.
+ */
+export function promotionBodyLimit(maxResponseBytes: number): number {
+  return Math.max(PROMOTION_BODY_LIMIT, 2 * maxResponseBytes + PROMOTION_BODY_LIMIT);
+}
+
 /** A decoded `POST /_janus/promotions` body. */
 export interface PromotionRequest {
   readonly capture: { readonly scenario: string; readonly exchange: string };
@@ -56,6 +64,7 @@ function jsonBody(
   headers: HeaderMap,
   body: Uint8Array | null,
   refuse: (field: string, message: string) => PromotionError = invalid,
+  limit: number = PROMOTION_BODY_LIMIT,
 ): Record<string, unknown> {
   const contentType = headers['content-type'];
   const essence = contentType?.length === 1 ? (contentType[0] ?? '').split(';')[0]?.trim().toLowerCase() : undefined;
@@ -63,8 +72,8 @@ function jsonBody(
     throw new PromotionError(415, 'unsupported-media-type', 'The body must be sent as application/json');
   }
   const bytes = body ?? new Uint8Array();
-  if (bytes.length > PROMOTION_BODY_LIMIT) {
-    throw new PromotionError(413, 'request-too-large', `The body is larger than ${String(PROMOTION_BODY_LIMIT)} bytes`);
+  if (bytes.length > limit) {
+    throw new PromotionError(413, 'request-too-large', `The body is larger than ${String(limit)} bytes`);
   }
   let value: unknown;
   try {
@@ -121,8 +130,12 @@ export function parseScenarioRequest(headers: HeaderMap, body: Uint8Array | null
 }
 
 /** Decodes a promotion request; every member is checked before anything is read. */
-export function parsePromotionRequest(headers: HeaderMap, body: Uint8Array | null): PromotionRequest {
-  const value = jsonBody(headers, body);
+export function parsePromotionRequest(
+  headers: HeaderMap,
+  body: Uint8Array | null,
+  limit: number = PROMOTION_BODY_LIMIT,
+): PromotionRequest {
+  const value = jsonBody(headers, body, invalid, limit);
   const unknown = Object.keys(value).find((key) => !PROMOTION_MEMBERS.has(key));
   if (unknown !== undefined) throw invalid(unknown, 'is not a member of a promotion request');
   const captureText = value['capture'];

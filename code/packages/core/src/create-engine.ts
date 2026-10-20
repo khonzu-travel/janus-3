@@ -19,6 +19,7 @@ import type { CaptureReservation, RecordingPorts } from './recording/ports.js';
 import { registrationsOf } from './recording/registrations.js';
 import { RecordingSlots } from './recording/slots.js';
 import { createPromoter, type EnginePromotions, type PromotionPorts } from './promotion/promoter.js';
+import { promotionBodyLimit } from './promotion/request.js';
 import { describeSession, resetSequences, stillCurrent, writeSession, type SessionContext } from './sessions/api.js';
 import { SESSION_CLOCK_OVERRUN, sessionInstant, SessionStore } from './sessions/store.js';
 import type {
@@ -132,6 +133,7 @@ export function createEngine(options: CreateEngineOptions): Engine {
     items: () => active.atlas.promotions().items,
     clock: options.clock ?? (() => 0),
     defaultScenario: () => config.defaultScenario,
+    bodyLimit: promotionBodyLimit(config.recording.maxResponseBytes),
   });
   const recorder: Recorder = {
     ports: options.recording,
@@ -251,6 +253,7 @@ export function createEngine(options: CreateEngineOptions): Engine {
       },
     }),
     promotions: Object.freeze({
+      bodyLimit: promoter.bodyLimit,
       promote: (...args: Parameters<EnginePromotions['promote']>) => promoter.promote(...args),
       review: (...args: Parameters<EnginePromotions['review']>) => promoter.review(...args),
       createScenario: (...args: Parameters<EnginePromotions['createScenario']>) => promoter.createScenario(...args),

@@ -425,6 +425,28 @@ describe('promotion', () => {
     });
   });
 
+  it('takes an edited response as large as recording.maxResponseBytes allows', async () => {
+    const janus = harness();
+    await janus.record();
+    expect(janus.engine.promotions.bodyLimit).toBe(2 * 4096 + 64 * 1024);
+    const body = JSON.stringify({ id: 'pay_8f2e91c0', pad: 'x'.repeat(70 * 1024) });
+    // The dry run shows the edited text whole.
+    expect(await janus.promote({ capture: 'declined/000001', body, dryRun: true })).toMatchObject({
+      ok: true,
+      document: {
+        files: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'response',
+            preview: expect.objectContaining({ truncated: false }) as unknown,
+          }),
+        ]) as unknown,
+      },
+    });
+    expect(
+      failure(await janus.promote({ capture: 'declined/000001', body: 'x'.repeat(janus.engine.promotions.bodyLimit) })),
+    ).toMatchObject({ status: 413, code: 'request-too-large' });
+  });
+
   it('refuses a promoted file without replace, and replaces it when named', async () => {
     const janus = harness();
     await janus.record();
