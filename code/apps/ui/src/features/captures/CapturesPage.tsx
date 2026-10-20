@@ -3,8 +3,9 @@ import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-rout
 
 import type { CaptureItem, CaptureQuery } from '../../atlas/client.js';
 import { CAPTURE_OUTCOMES, type CaptureOutcome } from '../../atlas/wire.js';
-import { buttonClass, linkClass } from '../../components/buttonClass.js';
+import { buttonClass, linkClass, removableRowClass, removeIconButtonClass } from '../../components/buttonClass.js';
 import { HelpTip } from '../../components/HelpTip.js';
+import { TrashIcon } from '../../components/icons.js';
 import { MethodBadge } from '../../components/MethodBadge.js';
 import { filterInputClass, onControl, openableRowClass, pageToolbarClass } from '../../components/listRows.js';
 import { EmptyState } from '../../components/states/EmptyState.js';
@@ -12,10 +13,12 @@ import { Timestamp } from '../../components/Timestamp.js';
 import { ErrorState } from '../../components/states/ErrorState.js';
 import { isUnsupported } from '../../components/states/errors.js';
 import { LoadingState } from '../../components/states/LoadingState.js';
+import { useAtlasSession } from '../../hooks/AtlasSession.js';
 import { useSnapshotFeed } from '../../hooks/SnapshotFeed.js';
-import { useCaptures, useClock, useRestart } from '../../hooks/useAtlas.js';
+import { useCaptures, useCapturesChanged, useClock, useRestart } from '../../hooks/useAtlas.js';
 import type { AtlasLayoutContext } from '../../layouts/AtlasLayoutContext.js';
 import { scenarioSearch } from '../../scenarios/selection.js';
+import { ConfirmDialog } from '../requests/RequestWorkspace.js';
 
 type OutcomeFilter = CaptureOutcome | 'unreadable';
 
@@ -49,7 +52,7 @@ const selectClass =
  * `#/captures`: recorded exchanges, newest first, filtered by
  * the selected scenario and an outcome, paged with the list's `next`. New
  * captures arrive as `capture` events and are announced politely; focus stays
- * where it is. The page only reads.
+ * where it is. Each capture can be deleted, after a confirmation.
  */
 export function CapturesPage() {
   const { health, scenario } = useOutletContext<AtlasLayoutContext>();
@@ -110,8 +113,8 @@ export function CapturesPage() {
           </h2>
           <HelpTip label="About captures">
             <strong className="font-medium text-fg">Captures are not served.</strong> They are exchanges recorded from
-            registered upstreams, kept for review only. Janus never answers a request from them, and this page cannot
-            change, move or delete one.
+            registered upstreams, kept for review only. Janus never answers a request from them. Deleting one removes
+            its files and its log line; files promoted from it stay.
           </HelpTip>
         </div>
         {scenario.supported ? (
@@ -251,6 +254,10 @@ function matching(items: readonly CaptureItem[], text: string): readonly Capture
 function CaptureTable({ items, keep }: { readonly items: readonly CaptureItem[]; readonly keep: string }) {
   const timeZone = useClock().data?.timezone;
   const navigate = useNavigate();
+  const { client } = useAtlasSession();
+  const changed = useCapturesChanged();
+  // The capture whose Delete is being confirmed.
+  const [deleting, setDeleting] = useState<string | null>(null);
   return (
     <div className="border-b border-line bg-surface">
       <table className="stack-table data-table">
@@ -265,6 +272,9 @@ function CaptureTable({ items, keep }: { readonly items: readonly CaptureItem[];
             <th scope="col">Outcome</th>
             <th scope="col">Duration</th>
             <th scope="col">Source</th>
+            <th scope="col">
+              <span className="sr-only">Delete</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -277,14 +287,14 @@ function CaptureTable({ items, keep }: { readonly items: readonly CaptureItem[];
                 <td data-label="Scenario" className="font-mono text-mono">
                   {item.scenario}
                 </td>
-                <td colSpan={6} data-label="Outcome" className="text-bad">
+                <td colSpan={7} data-label="Outcome" className="text-bad">
                   {OUTCOME_TEXT.unreadable}: line {item.line} of log.jsonl does not parse.
                 </td>
               </tr>
             ) : (
               <tr
                 key={item.id}
-                className={item.detailUrl === null ? undefined : openableRowClass}
+                className={`${removableRowClass} ${item.detailUrl === null ? '' : openableRowClass}`}
                 onClick={(event) => {
                   if (item.detailUrl === null || onControl(event.target)) return;
                   void navigate({ pathname: `/captures/${item.id}`, search: keep });
@@ -319,11 +329,51 @@ function CaptureTable({ items, keep }: { readonly items: readonly CaptureItem[];
                   {item.durationMs} ms
                 </td>
                 <td data-label="Source">{item.source === 'runner' ? 'Request runner' : 'Recording'}</td>
+                <td className="w-0">
+                  <button
+                    type="button"
+                    data-remove=""
+                    className={removeIconButtonClass}
+                    aria-label={`Delete capture ${item.id}`}
+                    title="Delete"
+                    onClick={() => {
+                      setDeleting(item.id);
+                    }}
+                  >
+                    <TrashIcon className="size-3.5" />
+                  </button>
+                </td>
               </tr>
             ),
           )}
         </tbody>
       </table>
+      {deleting === null ? null : (
+        <ConfirmDialog
+          title={`Delete capture ${deleting}?`}
+          confirm="Delete"
+          onClose={() => {
+            setDeleting(null);
+          }}
+          onConfirm={async () => {
+            await client.deleteCapture(deleting);
+            await changed();
+            setDeleting(null);
+          }}
+        >
+          <DeleteCaptureText />
+        </ConfirmDialog>
+      )}
     </div>
+  );
+}
+
+/** What deleting a capture removes, and what it leaves. */
+export function DeleteCaptureText() {
+  return (
+    <p>
+      This deletes the capture&rsquo;s files and its line in <code className="font-mono text-mono">log.jsonl</code>.
+      Files promoted from it stay. This cannot be undone.
+    </p>
   );
 }

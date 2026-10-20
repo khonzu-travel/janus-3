@@ -5,7 +5,7 @@ import { AtlasError, type Fixture } from '../../atlas/client.js';
 import type { WireFilePromotion } from '../../atlas/wire.js';
 import { linkClass, primaryButtonClass } from '../../components/buttonClass.js';
 import { useAtlasSession } from '../../hooks/AtlasSession.js';
-import { useRefresh } from '../../hooks/useAtlas.js';
+import { useHealth, usePromotions, useRefresh } from '../../hooks/useAtlas.js';
 import { ReviewPill } from './PromotionsPage.js';
 import { noteSentence, refusalSentence, rewriteSentence, suggestionSentence } from './sentences.js';
 
@@ -18,6 +18,7 @@ import { noteSentence, refusalSentence, rewriteSentence, suggestionSentence } fr
 export function PromotionPanel({ fixture }: { readonly fixture: Fixture }) {
   const { client } = useAtlasSession();
   const refresh = useRefresh();
+  const promotions = usePromotions(useHealth().data, { review: null, scenario: null });
   const [state, setState] = useState<
     { readonly kind: 'idle' | 'sending' } | { readonly kind: 'failed'; message: string }
   >({ kind: 'idle' });
@@ -45,6 +46,9 @@ export function PromotionPanel({ fixture }: { readonly fixture: Fixture }) {
 
   const main = response ?? sidecar;
   if (main === null) return null;
+  // A capture that no longer exists was most likely deleted.
+  const captureDeleted =
+    promotions.data?.items.some((item) => item.capture === main.capture && !item.captureExists) ?? false;
   return (
     <section aria-labelledby="promotion-title" className="mx-4 mt-2 rounded border border-line bg-surface">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-1.5">
@@ -54,9 +58,15 @@ export function PromotionPanel({ fixture }: { readonly fixture: Fixture }) {
         <ReviewPill review={pending.length > 0 ? 'pending' : 'reviewed'} />
         <span className="text-muted">
           from capture{' '}
-          <Link to={`/captures/${main.capture}`} className={`${linkClass} font-mono text-mono`}>
-            {main.capture}
-          </Link>{' '}
+          {captureDeleted ? (
+            <>
+              <span className="font-mono text-mono">{main.capture}</span> (deleted)
+            </>
+          ) : (
+            <Link to={`/captures/${main.capture}`} className={`${linkClass} font-mono text-mono`}>
+              {main.capture}
+            </Link>
+          )}{' '}
           at <span className="font-mono text-mono">{main.promotedAt}</span>
         </span>
         {pending.length > 0 ? (

@@ -3,6 +3,7 @@ import {
   CAPTURE_LIST_OUTCOMES,
   EXCHANGE_PATTERN,
   parseCaptureCursor,
+  parseCaptureLogLine,
   projectCaptureDetail,
   projectCaptureList,
   type CaptureListQuery,
@@ -99,6 +100,8 @@ export interface AtlasCaptureService {
   ): Promise<{ readonly entry: CaptureLogEntry; readonly files: ReadonlyMap<string, Uint8Array | null> } | null>;
   /** Subscribes to `capture` events; returns the unsubscribe function. */
   subscribe(listener: (event: AtlasCaptureEvent) => void): () => void;
+  /** Deletes an exchange's log lines and files; false when no log line names it. */
+  delete(scenario: string, exchange: string): Promise<boolean>;
 }
 
 /** What the Atlas routes need besides the engine's projections. */
@@ -191,6 +194,7 @@ const ALLOWED: Readonly<Partial<Record<AtlasRoute, readonly string[]>>> = {
   reload: ['GET', 'HEAD', 'POST'],
   session: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'],
   sequences: ['DELETE'],
+  capture: ['GET', 'HEAD', 'DELETE'],
   promotions: ['GET', 'HEAD', 'POST'],
   'promotions-review': ['POST'],
   // POST creates a scenario.
@@ -206,6 +210,7 @@ const ORIGIN_CHECKED: ReadonlySet<AtlasRoute> = new Set<AtlasRoute>([
   'reload',
   'session',
   'sequences',
+  'capture',
   'promotions',
   'promotions-review',
   'scenarios',
@@ -512,6 +517,12 @@ export async function handleAtlasRequest(context: AtlasContext, request: AtlasRe
       if (!isScenarioName(scenario) || !EXCHANGE_PATTERN.test(exchange)) {
         return fail(404, 'atlas-resource-not-found', 'No capture with this ID exists');
       }
+      if (method === 'DELETE') {
+        // Any logged exchange, failed ones too; promoted files are copies and stay.
+        const deleted = context.captures !== null && (await context.captures.delete(scenario, exchange));
+        if (!deleted) return fail(404, 'atlas-resource-not-found', 'No capture with this ID exists');
+        return { status: 204, headers: { 'cache-control': 'no-store' }, body: null, path };
+      }
       const found = context.captures === null ? null : await context.captures.exchange(scenario, exchange);
       if (found === null) return fail(404, 'atlas-resource-not-found', 'No capture with this ID exists');
       return ok({
@@ -533,11 +544,14 @@ export async function handleAtlasRequest(context: AtlasContext, request: AtlasRe
         return fail(409, 'atlas-snapshot-stale', 'The fixture snapshot changed; reload the list');
       }
       const items = filterPromotions(list.items, query);
+      const captured = await capturedIds(context.captures);
       return ok({
         apiVersion: ATLAS_API_VERSION,
         at: list.snapshotVersion,
         items: items.map((item) => ({
           ...item,
+          // Whether the capture it came from is still on disk; the promoted file stays either way.
+          captureExists: captured.has(item.capture),
           ...(item.fixtureId === undefined
             ? {}
             : { detailHref: detailHref('fixtures', item.fixtureId, list.snapshotVersion) }),
@@ -588,6 +602,18 @@ export async function handleAtlasRequest(context: AtlasContext, request: AtlasRe
 }
 
 export const EVENT_STREAM_CONTENT_TYPE = 'text/event-stream';
+
+/** The ID of every exchange with a `captured` line, in every scenario. */
+async function capturedIds(captures: AtlasCaptureService | null): Promise<ReadonlySet<string>> {
+  const ids = new Set<string>();
+  for (const log of captures === null ? [] : await captures.logs()) {
+    for (const line of log.lines) {
+      const entry = parseCaptureLogLine(line);
+      if (entry?.outcome === 'captured') ids.add(`${log.scenario}/${entry.exchange}`);
+    }
+  }
+  return ids;
+}
 
 /** `POST /_janus/resolve`: decode the envelope, simulate, and explain. */
 async function resolveRoute(

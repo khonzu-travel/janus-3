@@ -255,11 +255,15 @@ test('imports a Postman collection, saves a value as a variable, and runs it in 
   await expect(page.getByRole('cell', { name: 'Request runner' })).toHaveCount(3);
 
   // 5. Promote the captures and run in Mock mode: the steps are answered from the fixtures.
-  for (const exchange of ['000001', '000002', '000003']) {
+  const captures = (await (await fetch(`${janus.url}/_janus/captures?scenario=cart-with-one-item`)).json()) as {
+    items: { id: string }[];
+  };
+  expect(captures.items).toHaveLength(3);
+  for (const { id } of captures.items) {
     const promoted = await fetch(`${janus.url}/_janus/promotions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ capture: `cart-with-one-item/${exchange}` }),
+      body: JSON.stringify({ capture: id }),
     });
     expect(promoted.status, await promoted.clone().text()).toBe(201);
   }

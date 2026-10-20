@@ -123,7 +123,10 @@ function plan(dryRun: boolean, conflicts: readonly Doc[] = []): Doc {
 }
 
 /** A server that records and promotes, with one promoted response pending review. */
-function promotingAtlas(sidecarConflict = false): { fake: FakeAtlas; posts: { path: string; body: Doc }[] } {
+function promotingAtlas(
+  sidecarConflict = false,
+  captureDeleted = false,
+): { fake: FakeAtlas; posts: { path: string; body: Doc }[] } {
   const fake = new FakeAtlas();
   const posts: { path: string; body: Doc }[] = [];
   fake.capabilities = {
@@ -224,6 +227,7 @@ function promotingAtlas(sidecarConflict = false): { fake: FakeAtlas; posts: { pa
             fixtureId: FX,
             endpointId: EP,
             capture: 'default/000001',
+            captureExists: !captureDeleted,
             promotedAt: '2026-10-05T09:12:40Z',
             review: 'pending',
             reviewedAt: null,
@@ -235,6 +239,7 @@ function promotingAtlas(sidecarConflict = false): { fake: FakeAtlas; posts: { pa
             scenario: 'default',
             file: '/v1/payments/POST/402.headers.json',
             capture: 'default/000001',
+            captureExists: !captureDeleted,
             promotedAt: '2026-10-05T09:12:40Z',
             review: 'pending',
             reviewedAt: null,
@@ -245,7 +250,11 @@ function promotingAtlas(sidecarConflict = false): { fake: FakeAtlas; posts: { pa
         pending: 2,
       });
     }
-    if (path === 'captures/default/000001') return jsonResponse(200, { apiVersion: 'atlas.v1', ...CAPTURE });
+    if (path === 'captures/default/000001') {
+      return captureDeleted
+        ? errorResponse(404, 'atlas-resource-not-found', 'No capture with this ID exists')
+        : jsonResponse(200, { apiVersion: 'atlas.v1', ...CAPTURE });
+    }
     if (path === 'recording') {
       return jsonResponse(200, {
         apiVersion: 'atlas.v1',
@@ -337,6 +346,27 @@ describe('the Promotions page', () => {
     await waitFor(() => {
       expect(window.location.hash).toMatch(/^#\/endpoints\/[^/]+\/fixtures\//);
     });
+  });
+
+  it('says a capture that no longer exists was deleted, and its address that it does not exist', async () => {
+    const { fake } = promotingAtlas(false, true);
+    renderApp(fake, '#/promotions');
+    const table = await screen.findByRole('table', { name: /Promotions/ });
+    const row = within(table).getAllByRole('row')[1] as HTMLElement;
+    expect(row.textContent).toContain('default/000001 deleted');
+    expect(within(row).queryByRole('link', { name: 'default/000001' })).toBeNull();
+
+    document.body.innerHTML = '';
+    renderApp(fake, `#/endpoints/${EP}/fixtures/${FX}`);
+    const panel = await screen.findByRole('region', { name: 'Promoted' });
+    await waitFor(() => {
+      expect(panel.textContent).toContain('default/000001 (deleted)');
+    });
+    expect(within(panel).queryByRole('link', { name: 'default/000001' })).toBeNull();
+
+    document.body.innerHTML = '';
+    renderApp(fake, '#/captures/default/000001');
+    expect(await screen.findByRole('heading', { name: 'Capture does not exist' })).toBeDefined();
   });
 
   it('is not offered when the server cannot promote', async () => {

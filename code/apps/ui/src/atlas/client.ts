@@ -76,7 +76,7 @@ import {
 } from './runner.js';
 
 /** A capture ID: a scenario name and a six-digit exchange number. */
-const CAPTURE_ID = /^[a-z0-9]+(-[a-z0-9]+)*\/[0-9]{6}$/;
+const CAPTURE_ID = /^[a-z0-9]+(-[a-z0-9]+)*\/(?:[0-9a-f]{8}|[0-9]{6})$/;
 
 /** Default bound on any single Atlas request, connection and body included. */
 export const DEFAULT_TIMEOUT_MS = 10_000;
@@ -290,6 +290,8 @@ export interface AtlasClient {
   captureUrl(id: string): string | null;
   /** One capture, from the list's server-issued link. */
   capture(detailUrl: string, signal?: AbortSignal): Promise<CaptureDetail>;
+  /** `DELETE /_janus/captures/{id}`: deletes capture `scenario/exchange`, failed ones too. */
+  deleteCapture(id: string, signal?: AbortSignal): Promise<void>;
   /** `GET /_janus/promotions`: promoted files, newest first. */
   promotions(query: PromotionQuery, signal?: AbortSignal): Promise<PromotionList>;
   /** `POST /_janus/promotions`: a dry run with `dryRun: true`, otherwise a write. */
@@ -705,6 +707,10 @@ export function createAtlasClient(config: AtlasConfig, options: AtlasClientOptio
         },
         signal,
       );
+    },
+    async deleteCapture(id, signal) {
+      if (!CAPTURE_ID.test(id)) throw new Error(`Not a capture ID: ${id}`);
+      await send(new URL(`captures/${id}`, root), () => undefined, signal, { method: 'DELETE' });
     },
     async promotions(query, signal) {
       const url = new URL('promotions', root);

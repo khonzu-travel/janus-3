@@ -161,6 +161,7 @@ function matching(groups: readonly PromotionGroup[], text: string): readonly Pro
     const haystack = [
       group.scenario,
       group.capture,
+      group.files.some((file) => !file.captureExists) ? 'Capture deleted' : '',
       group.promotedAt,
       ...group.files.flatMap((file) => [
         file.file,
@@ -264,9 +265,15 @@ function PromotionTable({
                   </ul>
                 </td>
                 <td data-label="Capture" className="font-mono text-mono">
-                  <Link to={`/captures/${group.capture}`} className={linkClass}>
-                    {group.capture}
-                  </Link>
+                  {group.files.some((file) => !file.captureExists) ? (
+                    <>
+                      {group.capture} <span className="font-sans text-faint">deleted</span>
+                    </>
+                  ) : (
+                    <Link to={`/captures/${group.capture}`} className={linkClass}>
+                      {group.capture}
+                    </Link>
+                  )}
                 </td>
                 <td data-label="Review">
                   <ReviewPill review={group.files.some((file) => file.review === 'pending') ? 'pending' : 'reviewed'} />

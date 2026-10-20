@@ -1543,7 +1543,7 @@ export const CAPTURE_OUTCOMES: readonly CaptureOutcome[] = [
   'response-too-large',
 ];
 
-const exchangeNumber = pattern(/^[0-9]{6}$/, 'an exchange number');
+const exchangeId = pattern(/^(?:[0-9a-f]{8}|[0-9]{6})$/, 'an exchange ID');
 
 /** An upstream may answer any three-digit status, which Janus relays and captures unchanged. */
 const captureStatus: Decoder<number> = (value, path) => {
@@ -1593,7 +1593,7 @@ const captureItem: Decoder<WireCaptureItem> = oneOf<WireCaptureItem>(
     outcome: captureOutcome,
     id: string,
     scenario: scenarioName,
-    exchange: exchangeNumber,
+    exchange: exchangeId,
     at: string,
     method: string,
     target: string,
@@ -1748,6 +1748,8 @@ export interface WirePromotionItem {
   readonly fixtureId: string | null;
   readonly endpointId: string | null;
   readonly capture: string;
+  /** The capture it came from is still on disk; true from an older server. */
+  readonly captureExists: boolean;
   readonly promotedAt: string;
   readonly review: ReviewState;
   readonly reviewedAt: string | null;
@@ -1776,6 +1778,7 @@ export const decodePromotionList: Decoder<WirePromotionList> = object<WirePromot
       fixtureId: optional(nullable(fixtureId), null),
       endpointId: optional(nullable(endpointId), null),
       capture: string,
+      captureExists: optional(boolean, true),
       promotedAt: string,
       review: reviewState,
       reviewedAt: optional(nullable(string), null),

@@ -65,12 +65,13 @@ test('promotes a capture from the UI, serves it with the scenario ID, and marks 
     headers: { 'x-mock-record': 'true', 'x-mock-scenario': 'payment-declined', 'content-type': 'application/json' },
     body: '{}',
   });
-  expect(recorded.headers.get('x-mock-recorded')).toBe('payment-declined/000001');
+  const capture = recorded.headers.get('x-mock-recorded') ?? '';
+  expect(capture).toMatch(/^payment-declined\/[0-9a-f]{8}$/);
 
   // 3. Open the capture and Promote it with paymentId bound explicitly.
-  await page.goto(`${janus.url}/_janus/ui/#/captures/payment-declined/000001?scenario=payment-declined`);
+  await page.goto(`${janus.url}/_janus/ui/#/captures/${capture}?scenario=payment-declined`);
   await page.getByRole('button', { name: 'Promote' }).click();
-  const dialog = page.getByRole('dialog', { name: /Promote capture payment-declined\/000001/ });
+  const dialog = page.getByRole('dialog', { name: new RegExp(`Promote capture ${capture}`) });
   await expect(dialog.getByLabel('Scenario')).toBeFocused();
   await dialog.getByRole('button', { name: 'Bind an ID' }).click();
   await dialog.getByLabel('Captured value 1').fill('pay_8f2e91c0');
@@ -102,7 +103,7 @@ test('promotes a capture from the UI, serves it with the scenario ID, and marks 
   await audit(page, info, 'mouse', 'promotions');
   await table.getByRole('link', { name: '/v1/payments/POST/402.json' }).click();
   const panel = page.getByRole('region', { name: 'Promoted' });
-  await expect(panel).toContainText('payment-declined/000001');
+  await expect(panel).toContainText(capture);
   await panel.getByRole('button', { name: 'Mark reviewed' }).focus();
   await page.keyboard.press('Enter');
   await expect(panel.getByRole('button', { name: 'Mark reviewed' })).toBeHidden();

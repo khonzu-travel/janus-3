@@ -139,7 +139,7 @@ export function parsePromotionRequest(
   const unknown = Object.keys(value).find((key) => !PROMOTION_MEMBERS.has(key));
   if (unknown !== undefined) throw invalid(unknown, 'is not a member of a promotion request');
   const captureText = value['capture'];
-  if (typeof captureText !== 'string') throw invalid('capture', 'must be a capture ID such as default/000001');
+  if (typeof captureText !== 'string') throw invalid('capture', 'must be a capture ID such as default/3f9a0c1e');
   const capture = parseCaptureId(captureText);
   if (capture === null) {
     // Checked like the capture detail route's segments.

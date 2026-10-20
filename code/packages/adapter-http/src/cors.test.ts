@@ -171,7 +171,7 @@ describe('preflight', () => {
     ['/_janus/resolve', 'POST', 'POST'],
     ['/_janus/recording', 'GET', 'GET, HEAD'],
     ['/_janus/captures', 'GET', 'GET, HEAD'],
-    ['/_janus/captures/default/000001', 'GET', 'GET, HEAD'],
+    ['/_janus/captures/default/000001', 'DELETE', 'GET, HEAD, DELETE'],
   ])('succeeds for %s %s with the route methods', async (url, method, methods) => {
     const response = await preflight(url, method);
     expect(response.statusCode).toBe(204);

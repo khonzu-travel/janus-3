@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, useOutletContext, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router';
 
 import type { CaptureDetail, Health, PromotionResult } from '../../atlas/client.js';
-import { linkClass, primaryButtonClass } from '../../components/buttonClass.js';
-import { AlertIcon } from '../../components/icons.js';
+import { iconButtonClass, linkClass, primaryButtonClass } from '../../components/buttonClass.js';
+import { AlertIcon, TrashIcon } from '../../components/icons.js';
 import { MethodBadge } from '../../components/MethodBadge.js';
 import { ErrorState } from '../../components/states/ErrorState.js';
 import { isNotFound } from '../../components/states/errors.js';
 import { LoadingState } from '../../components/states/LoadingState.js';
 import { useAtlasSession } from '../../hooks/AtlasSession.js';
-import { useCapture, usePromotions, useRefresh, useRestart } from '../../hooks/useAtlas.js';
+import { useCapture, useCapturesChanged, usePromotions, useRefresh, useRestart } from '../../hooks/useAtlas.js';
 import type { AtlasLayoutContext } from '../../layouts/AtlasLayoutContext.js';
 import { scenarioSearch, withScenario } from '../../scenarios/selection.js';
 import { Collapsible } from '../../components/Collapsible.js';
@@ -17,6 +17,8 @@ import { HeaderList } from '../fixtures/Preview.js';
 import { PromoteDialog } from '../promotions/PromoteDialog.js';
 import { ReviewPill } from '../promotions/PromotionsPage.js';
 import { BodyView } from '../requests/JsonTree.js';
+import { ConfirmDialog } from '../requests/RequestWorkspace.js';
+import { DeleteCaptureText } from './CapturesPage.js';
 
 const NOTE_TEXT: Readonly<Record<string, string>> = {
   'body-encoded': 'The upstream sent an encoded body; it was relayed as sent but not stored.',
@@ -42,6 +44,9 @@ export function CaptureDetailPage() {
   // Kept here, not in the detail, so they survive the refetch a promotion starts.
   const [promoting, setPromoting] = useState(false);
   const [promoted, setPromoted] = useState<PromotionResult | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const navigate = useNavigate();
+  const changed = useCapturesChanged();
   const note = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     if (promoted !== null) note.current?.focus();
@@ -58,11 +63,7 @@ export function CaptureDetailPage() {
   let body: ReactNode;
   if (url === null || (capture.error !== null && isNotFound(capture.error))) {
     body = (
-      <ErrorState
-        title="No such capture"
-        message={`There is no captured exchange ${id}. It may have failed, or never existed.`}
-        headingLevel={2}
-      />
+      <ErrorState title="Capture does not exist" message={`There is no captured exchange ${id}.`} headingLevel={2} />
     );
   } else if (capture.error !== null) {
     body = <ErrorState title="Could not load the capture" error={capture.error} onRetry={restart} headingLevel={2} />;
@@ -81,6 +82,9 @@ export function CaptureDetailPage() {
               }
             : null
         }
+        onDelete={() => {
+          setDeleting(true);
+        }}
       />
     );
   }
@@ -119,6 +123,22 @@ export function CaptureDetailPage() {
           }}
         />
       ) : null}
+      {deleting ? (
+        <ConfirmDialog
+          title={`Delete capture ${id}?`}
+          confirm="Delete"
+          onClose={() => {
+            setDeleting(false);
+          }}
+          onConfirm={async () => {
+            await client.deleteCapture(id);
+            await navigate({ pathname: '/captures', search: scenarioSearch(search) });
+            void changed();
+          }}
+        >
+          <DeleteCaptureText />
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }
@@ -127,11 +147,14 @@ function Detail({
   capture,
   health,
   onPromote,
+  onDelete,
 }: {
   readonly capture: CaptureDetail;
   readonly health: Health;
   /** Opens the Promote dialog; null when this capture cannot be promoted here. */
   readonly onPromote: (() => void) | null;
+  /** Asks to delete this capture. */
+  readonly onDelete: () => void;
 }) {
   const { request, response, provenance } = capture;
   const promotions = usePromotions(health, { review: null, scenario: null });
@@ -178,11 +201,22 @@ function Detail({
             )}
           </p>
         </div>
-        {onPromote === null ? null : (
-          <button type="button" className={primaryButtonClass} onClick={onPromote}>
-            Promote
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className={iconButtonClass}
+            aria-label="Delete capture"
+            title="Delete"
+            onClick={onDelete}
+          >
+            <TrashIcon className="size-3.5" />
           </button>
-        )}
+          {onPromote === null ? null : (
+            <button type="button" className={primaryButtonClass} onClick={onPromote}>
+              Promote
+            </button>
+          )}
+        </div>
       </div>
       {capture.promotedTo.length === 0 ? null : (
         <Part title="Promoted to">

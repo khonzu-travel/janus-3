@@ -12,8 +12,8 @@ import {
 import { previewBody } from './atlas.js';
 import type { AtlasPreview, AtlasResponseHeader } from './types.js';
 
-/** Exchange numbers are exactly six decimal digits. */
-export const EXCHANGE_PATTERN = /^[0-9]{6}$/;
+/** Exchange IDs are eight random lowercase hex digits; captures from older servers keep six decimal digits. */
+export const EXCHANGE_PATTERN = /^(?:[0-9a-f]{8}|[0-9]{6})$/;
 
 /** The outcomes `?outcome=` filters on; `unreadable` lists log lines that do not parse. */
 export const CAPTURE_LIST_OUTCOMES: readonly (CaptureOutcome | 'unreadable')[] = Object.freeze([

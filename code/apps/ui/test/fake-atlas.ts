@@ -392,6 +392,8 @@ export class FakeAtlas {
   extra: ((path: string, url: URL) => Response | null) | null = null;
   /** POST answers checked before `resolve`, by path below the root (promotions); null passes. */
   extraPost: ((path: string, body: Doc) => Response | null) | null = null;
+  /** DELETE answers, by path below the root (captures); null passes. */
+  extraDelete: ((path: string) => Response | null) | null = null;
   /** Pathname + search of every request, in order. */
   readonly requests: string[] = [];
   readonly aborted: string[] = [];
@@ -416,6 +418,10 @@ export class FakeAtlas {
     }
     if (this.down) return Promise.reject(new TypeError('Failed to fetch'));
     if ((init?.method ?? 'GET') === 'POST') return Promise.resolve(this.post(url, init?.body));
+    if (init?.method === 'DELETE' && this.extraDelete !== null && url.href.startsWith(this.root)) {
+      const answer = this.extraDelete(url.href.slice(this.root.length));
+      if (answer !== null) return Promise.resolve(answer);
+    }
     return Promise.resolve(this.respond(url));
   };
 

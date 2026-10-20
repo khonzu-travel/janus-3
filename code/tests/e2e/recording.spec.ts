@@ -110,7 +110,7 @@ const recordPost = () =>
   });
 
 const exchanges = async () =>
-  (await readdir(join(root, 'captures', 'payment-declined'))).filter((name) => name !== 'log.jsonl').sort();
+  (await readdir(join(root, 'captures', 'payment-declined'))).filter((name) => /^[0-9a-f]{8}$/.test(name)).sort();
 
 test('records registered endpoints, reviews the captures, and never serves them', async ({ page }, info) => {
   // 2. An unregistered path is refused with no outbound activity.
@@ -125,7 +125,10 @@ test('records registered endpoints, reviews the captures, and never serves them'
   expect(postedBody).toBe(ECHO_BODY(seen[0] as Seen));
   expect(posted.headers.get('set-cookie')).toBeNull();
   expect(posted.headers.get('strict-transport-security')).toBeNull();
-  expect(posted.headers.get('x-mock-recorded')).toBe('payment-declined/000001');
+  // Capture IDs are random: eight hex digits, not a counter.
+  const postedId = posted.headers.get('x-mock-recorded') ?? '';
+  expect(postedId).toMatch(/^payment-declined\/[0-9a-f]{8}$/);
+  const firstExchange = postedId.split('/')[1] ?? '';
   const sent = seen[0] as Seen;
   expect(sent.url).toBe('/shop/v1/carts/c-9/items?coupon=SPRING');
   expect(sent.headers['authorization']).toBe('Bearer staging-token');
@@ -138,10 +141,11 @@ test('records registered endpoints, reviews the captures, and never serves them'
   const redirected = await fetch(`${janus.url}/v1/products/p-1`, { headers: RECORD, redirect: 'manual' });
   expect(redirected.status).toBe(302);
   expect(seen).toHaveLength(2);
+  const secondExchange = (redirected.headers.get('x-mock-recorded') ?? '').split('/')[1] ?? '';
 
-  // 5. Both exchanges, in order, valid under the fixture grammar and literal.
-  expect(await exchanges()).toEqual(['000001', '000002']);
-  const first = join(root, 'captures', 'payment-declined', '000001');
+  // 5. Both exchanges, valid under the fixture grammar and literal.
+  expect(await exchanges()).toEqual([firstExchange, secondExchange].sort());
+  const first = join(root, 'captures', 'payment-declined', firstExchange);
   const files = (await readdir(first)).sort();
   expect(files).toEqual(['402.headers.json', '402.json', '402.meta.json', 'request.json']);
   expect(await readFile(join(first, '402.json'), 'utf8')).toBe(postedBody);
@@ -184,12 +188,23 @@ test('records registered endpoints, reviews the captures, and never serves them'
   expect(simulated.trace.outcome.kind).toBe('would-record');
   expect(seen).toHaveLength(2);
 
-  // 8. After a restart, numbering continues and earlier exchanges are unchanged.
+  // 8. After a restart, a new exchange gets a new ID and earlier exchanges are unchanged.
   const before = await readFile(join(first, '402.json'), 'utf8');
   await janus.stop();
   janus = await serve();
   const again = await recordPost();
-  expect(again.headers.get('x-mock-recorded')).toBe('payment-declined/000003');
-  expect(await exchanges()).toEqual(['000001', '000002', '000003']);
+  const third = again.headers.get('x-mock-recorded') ?? '';
+  expect(third).toMatch(/^payment-declined\/[0-9a-f]{8}$/);
+  const thirdExchange = third.split('/')[1] ?? '';
+  expect(await exchanges()).toEqual([firstExchange, secondExchange, thirdExchange].sort());
   expect(await readFile(join(first, '402.json'), 'utf8')).toBe(before);
+
+  // 9. Deleting a capture from its page removes its files and its row, after a confirmation.
+  await page.goto(`${janus.url}/_janus/ui/#/captures/${third}?scenario=payment-declined`);
+  await page.getByRole('button', { name: 'Delete capture' }).click();
+  const confirm = page.getByRole('dialog', { name: `Delete capture ${third}?` });
+  await audit(page, info, 'mouse', 'delete capture');
+  await confirm.getByRole('button', { name: 'Delete' }).click();
+  await expect(table.getByRole('row')).toHaveCount(3);
+  expect(await exchanges()).toEqual([firstExchange, secondExchange].sort());
 });

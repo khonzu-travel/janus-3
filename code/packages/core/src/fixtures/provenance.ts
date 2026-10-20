@@ -76,7 +76,7 @@ export type ProvenanceResult =
 
 const META_NAME = /^(\d{3})(?:\.([^.]+))?\.meta\.json$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
-const CAPTURE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*\/[0-9]{6}$/;
+const CAPTURE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*\/(?:[0-9a-f]{8}|[0-9]{6})$/;
 const ENTRY_KEYS: ReadonlySet<string> = new Set([
   'source',
   'capture',

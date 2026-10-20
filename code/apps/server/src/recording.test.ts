@@ -1,3 +1,4 @@
+import type * as NodeCrypto from 'node:crypto';
 import { link, mkdir, mkdtemp, readdir, readFile, rename, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import {
   createServer,
@@ -14,11 +15,22 @@ import { gzipSync } from 'node:zlib';
 
 import { buildSnapshot, parseConfig, type EngineConfig, type RecordingEndpoint } from '@janus/core';
 import { readFixtureDirectory } from '@janus/fixtures-fs';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CaptureStore } from './captures.js';
 import { main, type CliEnvironment } from './main.js';
 import { startServer, type RunningServer, type ServeLogger } from './serve.js';
+
+// Capture IDs are random; these tests number them 00000001, 00000002, … in claim order instead.
+const ids = vi.hoisted(() => ({ next: 0 }));
+vi.mock('node:crypto', async (original) => {
+  const actual = await original<typeof NodeCrypto>();
+  return {
+    ...actual,
+    randomBytes: (size: number) =>
+      size === 4 ? Buffer.from((++ids.next).toString(16).padStart(8, '0'), 'hex') : actual.randomBytes(size),
+  };
+});
 
 // Recording against a local fake upstream.
 
@@ -26,6 +38,7 @@ let root: string;
 let servers: { close(): Promise<void> }[] = [];
 
 beforeEach(async () => {
+  ids.next = 0;
   root = await mkdtemp(join(tmpdir(), 'janus-recording-'));
   servers = [];
 });
@@ -225,7 +238,7 @@ const record = (extra: Record<string, string> = {}): Record<string, string> => (
 });
 
 async function exchanges(captures: string, scenario: string): Promise<string[]> {
-  return (await readdir(join(captures, scenario)).catch(() => [])).filter((name) => /^\d{6}$/.test(name)).sort();
+  return (await readdir(join(captures, scenario)).catch(() => [])).filter((name) => /^[0-9a-f]{8}$/.test(name)).sort();
 }
 
 async function logLines(captures: string, scenario: string): Promise<Record<string, unknown>[]> {
@@ -269,7 +282,7 @@ describe('recording through the server', () => {
     });
     expect(response.status).toBe(402);
     expect(await response.text()).toBe(body);
-    expect(response.headers.get('x-mock-recorded')).toBe('payment-declined/000001');
+    expect(response.headers.get('x-mock-recorded')).toBe('payment-declined/00000001');
     expect(response.headers.get('x-mock-scenario')).toBe('payment-declined');
     expect(response.headers.get('www-authenticate')).toBe('Bearer error="insufficient_scope"');
     for (const name of ['set-cookie', 'strict-transport-security', 'access-control-allow-origin', 'x-mock-identity']) {
@@ -287,16 +300,16 @@ describe('recording through the server', () => {
     const names = Object.keys(seen?.headers ?? {});
     expect(names.filter((name) => /^(x-mock-|x-forwarded-|forwarded$|via$)/.test(name))).toEqual([]);
 
-    const files = (await readdir(join(captures, 'payment-declined', '000001'))).sort();
+    const files = (await readdir(join(captures, 'payment-declined', '00000001'))).sort();
     expect(files).toEqual(['402.headers.json', '402.json', '402.meta.json', 'request.json']);
-    expect(await readFile(join(captures, 'payment-declined', '000001', '402.json'), 'utf8')).toBe(body);
+    expect(await readFile(join(captures, 'payment-declined', '00000001', '402.json'), 'utf8')).toBe(body);
     const sidecar = JSON.parse(
-      await readFile(join(captures, 'payment-declined', '000001', '402.headers.json'), 'utf8'),
+      await readFile(join(captures, 'payment-declined', '00000001', '402.headers.json'), 'utf8'),
     ) as Record<string, unknown>;
     expect(sidecar['set-cookie']).toBe('sid=up; Path=/');
     expect(sidecar['access-control-allow-origin']).toBe('*');
     const requestFile = JSON.parse(
-      await readFile(join(captures, 'payment-declined', '000001', 'request.json'), 'utf8'),
+      await readFile(join(captures, 'payment-declined', '00000001', 'request.json'), 'utf8'),
     ) as {
       params: unknown;
       headers: Record<string, string[]>;
@@ -306,7 +319,7 @@ describe('recording through the server', () => {
     expect(requestFile.headers['authorization']).toEqual(['Bearer test-token']);
     expect(requestFile.body).toEqual({ encoding: 'utf8', data: '{"card":{"number":"4000000000000002"}}' });
     expect(await logLines(captures, 'payment-declined')).toEqual([
-      expect.objectContaining({ exchange: '000001', outcome: 'captured', status: 402 }) as unknown,
+      expect.objectContaining({ exchange: '00000001', outcome: 'captured', status: 402 }) as unknown,
     ]);
     const requestLog = logs.find((line) => line.startsWith('request ') && line.includes('"recording"'));
     expect(requestLog).toContain(`"upstream":"${upstream.url}"`);
@@ -331,7 +344,7 @@ describe('recording through the server', () => {
     expect(upstream.seen[0]?.body).toBe('{"q":1}');
     expect(upstream.seen[0]?.headers['content-length']).toBe('7');
     const requestFile = JSON.parse(
-      await readFile(join(captures, 'payment-declined', '000001', 'request.json'), 'utf8'),
+      await readFile(join(captures, 'payment-declined', '00000001', 'request.json'), 'utf8'),
     ) as { body: unknown };
     expect(requestFile.body).toEqual({ encoding: 'utf8', data: '{"q":1}' });
   });
@@ -353,7 +366,7 @@ describe('recording through the server', () => {
     expect(upstream.seen[0]?.bytes.equals(gzip)).toBe(true);
     expect(upstream.seen[0]?.headers['content-encoding']).toBe('gzip');
     const requestFile = JSON.parse(
-      await readFile(join(captures, 'payment-declined', '000001', 'request.json'), 'utf8'),
+      await readFile(join(captures, 'payment-declined', '00000001', 'request.json'), 'utf8'),
     ) as { body: unknown; codings: unknown };
     expect(requestFile.body).toEqual({ encoding: 'utf8', data: '{"q":1}' });
     expect(requestFile.codings).toEqual(['gzip']);
@@ -380,7 +393,7 @@ describe('recording through the server', () => {
     expect(response.headers.get('x-janus-request-id')).toMatch(/^[0-9a-f-]{36}$/);
     // The capture stays literal.
     const sidecar = JSON.parse(
-      await readFile(join(captures, 'payment-declined', '000001', '200.headers.json'), 'utf8'),
+      await readFile(join(captures, 'payment-declined', '00000001', '200.headers.json'), 'utf8'),
     ) as Record<string, unknown>;
     expect(sidecar['x-janus-request-id']).toBe('upstream-id');
   });
@@ -435,7 +448,7 @@ describe('recording through the server', () => {
     expect(lines).toEqual(['X-A:1', 'x-b:2', 'x-a:3']);
     // request.json groups lines by lower-cased name, in order of first appearance.
     const requestFile = JSON.parse(
-      await readFile(join(captures, 'payment-declined', '000001', 'request.json'), 'utf8'),
+      await readFile(join(captures, 'payment-declined', '00000001', 'request.json'), 'utf8'),
     ) as { headers: Record<string, string[]> };
     const names = Object.keys(requestFile.headers).filter((name) => /^x-[ab]$/.test(name));
     expect(names).toEqual(['x-a', 'x-b']);
@@ -454,7 +467,7 @@ describe('recording through the server', () => {
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe('/elsewhere');
     expect(upstream.seen).toHaveLength(1);
-    expect((await readdir(join(captures, 'payment-declined', '000001'))).sort()).toEqual([
+    expect((await readdir(join(captures, 'payment-declined', '00000001'))).sort()).toEqual([
       '302.bin',
       '302.headers.json',
       '302.meta.json',
@@ -474,11 +487,13 @@ describe('recording through the server', () => {
     const response = await fetch(`${server.url}/v1/products/p-1`, { headers: record() });
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('{"a":1}');
-    const meta = JSON.parse(await readFile(join(captures, 'payment-declined', '000001', '200.meta.json'), 'utf8')) as {
+    const meta = JSON.parse(
+      await readFile(join(captures, 'payment-declined', '00000001', '200.meta.json'), 'utf8'),
+    ) as {
       notes: { code: string }[];
     };
     expect(meta.notes.map((note) => note.code)).toEqual(['body-encoded']);
-    expect(await readFile(join(captures, 'payment-declined', '000001', '200.json'), 'utf8')).toBe('');
+    expect(await readFile(join(captures, 'payment-declined', '00000001', '200.json'), 'utf8')).toBe('');
   });
 
   it('answers 403 without any connection for an unregistered request', async () => {
@@ -538,8 +553,8 @@ describe('recording through the server', () => {
     expect(dns.status).toBe(502);
     expect(((await dns.json()) as { error: { reason: string } }).error.reason).toBe('dns');
     expect(await logLines(captures, 'payment-declined')).toEqual([
-      expect.objectContaining({ exchange: '000001', outcome: 'upstream-failed', reason: 'refused' }) as unknown,
-      expect.objectContaining({ exchange: '000002', outcome: 'upstream-failed', reason: 'dns' }) as unknown,
+      expect.objectContaining({ exchange: '00000001', outcome: 'upstream-failed', reason: 'refused' }) as unknown,
+      expect.objectContaining({ exchange: '00000002', outcome: 'upstream-failed', reason: 'dns' }) as unknown,
     ]);
     // The server log alone carries the error text, and never the query.
     const failed = logs.filter((line) => line.startsWith('upstream-failed '));
@@ -550,7 +565,7 @@ describe('recording through the server', () => {
     expect(failed[0]).not.toContain('secret');
     expect(failed[1]).toContain('"reason":"dns"');
     expect(logs.find((line) => line.startsWith('request ') && line.includes('"reason":"refused"'))).toBeDefined();
-    expect(await readdir(join(captures, 'payment-declined', '000001'))).toEqual([]);
+    expect(await readdir(join(captures, 'payment-declined', '00000001'))).toEqual([]);
   });
 
   it('maps a slow upstream to 504 and a large body to 502', async () => {
@@ -589,8 +604,8 @@ describe('recording through the server', () => {
       expect(response.status).toBe(304);
       expect(await response.text()).toBe('');
       expect(response.headers.get('etag')).toBe('"unchanged"');
-      expect(response.headers.get('x-mock-recorded')).toBe('payment-declined/000001');
-      expect(await readFile(join(captures, 'payment-declined', '000001', '304'))).toHaveLength(0);
+      expect(response.headers.get('x-mock-recorded')).toBe('payment-declined/00000001');
+      expect(await readFile(join(captures, 'payment-declined', '00000001', '304'))).toHaveLength(0);
       expect(await logLines(captures, 'payment-declined')).toMatchObject([{ outcome: 'captured', status: 304 }]);
     },
   );
@@ -617,7 +632,7 @@ describe('recording through the server', () => {
     let capturesDir = '';
     const upstream = await fakeUpstream(async (_request, response) => {
       // Occupy a name the sink must create exclusively, so its write fails after the claim.
-      await writeFile(join(capturesDir, 'payment-declined', '000001', 'request.json'), 'taken');
+      await writeFile(join(capturesDir, 'payment-declined', '00000001', 'request.json'), 'taken');
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end('{"ok":true}');
     });
@@ -629,9 +644,9 @@ describe('recording through the server', () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('{"ok":true}');
     expect(response.headers.get('x-mock-recorded')).toBe('failed');
-    expect(await readdir(join(captures, 'payment-declined', '000001'))).toEqual(['request.json']);
+    expect(await readdir(join(captures, 'payment-declined', '00000001'))).toEqual(['request.json']);
     expect(await logLines(captures, 'payment-declined')).toEqual([
-      expect.objectContaining({ exchange: '000001', outcome: 'capture-failed' }) as unknown,
+      expect.objectContaining({ exchange: '00000001', outcome: 'capture-failed' }) as unknown,
     ]);
   });
 
@@ -693,43 +708,94 @@ describe('recording through the server', () => {
       items: { id: string; detailHref?: string }[];
       next: string | null;
     };
-    expect(list.items.map((item) => item.id).sort()).toEqual(['default/000001', 'payment-declined/000001']);
+    expect(list.items.map((item) => item.id).sort()).toEqual(['default/00000002', 'payment-declined/00000001']);
     const filtered = (await (await fetch(`${server.url}/_janus/captures?scenario=default&limit=1`)).json()) as {
       items: { id: string }[];
     };
-    expect(filtered.items.map((item) => item.id)).toEqual(['default/000001']);
+    expect(filtered.items.map((item) => item.id)).toEqual(['default/00000002']);
     expect((await fetch(`${server.url}/_janus/captures?limit=0`)).status).toBe(400);
     expect((await fetch(`${server.url}/_janus/captures?scenario=Bad`)).status).toBe(400);
-    expect((await fetch(`${server.url}/_janus/captures?before=../000001`)).status).toBe(400);
+    expect((await fetch(`${server.url}/_janus/captures?before=../00000001`)).status).toBe(400);
 
-    const detail = await fetch(`${server.url}/_janus/captures/payment-declined/000001`);
+    const detail = await fetch(`${server.url}/_janus/captures/payment-declined/00000001`);
     expect(detail.status).toBe(200);
     const document = (await detail.json()) as {
       id: string;
       request: { target: string };
       response: { fileName: string; headers: unknown; modified: boolean };
     };
-    expect(document.id).toBe('payment-declined/000001');
+    expect(document.id).toBe('payment-declined/00000001');
     expect(document.request.target).toBe('/v1/products/p-1');
     expect(document.response).toMatchObject({
       fileName: '200.json',
       headers: [{ name: 'set-cookie', value: 'a=1' }],
       modified: false,
     });
-    await writeFile(join(captures, 'payment-declined', '000001', '200.json'), '{"edited":true}');
-    const modified = (await (await fetch(`${server.url}/_janus/captures/payment-declined/000001`)).json()) as {
+    await writeFile(join(captures, 'payment-declined', '00000001', '200.json'), '{"edited":true}');
+    const modified = (await (await fetch(`${server.url}/_janus/captures/payment-declined/00000001`)).json()) as {
       response: { modified: boolean };
     };
     expect(modified.response.modified).toBe(true);
 
-    expect((await fetch(`${server.url}/_janus/captures/payment-declined/000009`)).status).toBe(404);
+    expect((await fetch(`${server.url}/_janus/captures/payment-declined/00000009`)).status).toBe(404);
     expect((await fetch(`${server.url}/_janus/captures/payment-declined/1`)).status).toBe(404);
-    expect((await fetch(`${server.url}/_janus/captures/payment-declined/000001/x`)).status).toBe(404);
+    expect((await fetch(`${server.url}/_janus/captures/payment-declined/00000001/x`)).status).toBe(404);
     expect((await fetch(`${server.url}/_janus/captures/payment-declined`)).status).toBe(404);
-    expect((await fetch(`${server.url}/_janus/captures/payment-declined/000001`, { method: 'DELETE' })).status).toBe(
-      405,
-    );
+    expect((await fetch(`${server.url}/_janus/captures`, { method: 'DELETE' })).status).toBe(405);
     expect((await fetch(`${server.url}/_janus/captures`, { method: 'POST' })).status).toBe(405);
+  });
+
+  it('deletes a capture, failed ones and ones numbered by an older server too', async () => {
+    let fail = false;
+    const upstream = await fakeUpstream((_request, response) => {
+      if (fail) {
+        response.socket?.destroy();
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end('{"ok":true}');
+    });
+    const { server, captures } = await janus([
+      { method: 'GET', path: '/v1/products/{productId}', upstream: upstream.url },
+    ]);
+    await fetch(`${server.url}/v1/products/p-1`, { headers: record() });
+    await fetch(`${server.url}/v1/products/p-2`, { headers: record() });
+    fail = true;
+    await fetch(`${server.url}/v1/products/p-3`, { headers: record() });
+    expect(await exchanges(captures, 'payment-declined')).toEqual(['00000001', '00000002', '00000003']);
+
+    const remove = (id: string, headers: Record<string, string> = {}) =>
+      fetch(`${server.url}/_janus/captures/${id}`, { method: 'DELETE', headers });
+    const deleted = await remove('payment-declined/00000001');
+    expect(deleted.status).toBe(204);
+    expect(deleted.headers.get('cache-control')).toBe('no-store');
+    expect(await deleted.text()).toBe('');
+    // The failed exchange has no detail, but it can be deleted from the list.
+    expect((await remove('payment-declined/00000003')).status).toBe(204);
+    expect(await exchanges(captures, 'payment-declined')).toEqual(['00000002']);
+    expect((await logLines(captures, 'payment-declined')).map((line) => line['exchange'])).toEqual(['00000002']);
+    const list = (await (await fetch(`${server.url}/_janus/captures`)).json()) as { items: { id: string }[] };
+    expect(list.items.map((item) => item.id)).toEqual(['payment-declined/00000002']);
+    expect((await fetch(`${server.url}/_janus/captures/payment-declined/00000001`)).status).toBe(404);
+
+    expect((await remove('payment-declined/00000001')).status).toBe(404);
+    expect((await remove('payment-declined/00000009')).status).toBe(404);
+    expect((await remove('nothing/00000001')).status).toBe(404);
+    expect([400, 404]).toContain((await remove('..%2Fdata/00000001')).status);
+    expect((await remove('payment-declined/00000002', { origin: 'https://elsewhere.example' })).status).toBe(403);
+    expect(await exchanges(captures, 'payment-declined')).toEqual(['00000002']);
+
+    // A six-digit capture from an older server is listed and deleted like the others.
+    await mkdir(join(captures, 'payment-declined', '000007'));
+    await writeFile(
+      join(captures, 'payment-declined', 'log.jsonl'),
+      '{"exchange":"000007","at":"2026-10-01T00:00:00.000Z","method":"GET","target":"/","registration":"/","outcome":"upstream-failed","durationMs":1}\n',
+      { flag: 'a' },
+    );
+    const older = (await (await fetch(`${server.url}/_janus/captures`)).json()) as { items: { id: string }[] };
+    expect(older.items.map((item) => item.id)).toContain('payment-declined/000007');
+    expect((await remove('payment-declined/000007')).status).toBe(204);
+    expect((await logLines(captures, 'payment-declined')).map((line) => line['exchange'])).toEqual(['00000002']);
   });
 
   it('rejects traversal and ambiguous encodings before reading anything', async () => {
@@ -741,12 +807,12 @@ describe('recording through the server', () => {
     ]);
     await writeFile(join(root, 'secret.json'), '{"secret":true}');
     for (const target of [
-      '/_janus/captures/..%2Fsecret/000001',
-      '/_janus/captures/%2E%2E/000001',
-      '/_janus/captures/payment-declined%5C..%5C/000001',
+      '/_janus/captures/..%2Fsecret/00000001',
+      '/_janus/captures/%2E%2E/00000001',
+      '/_janus/captures/payment-declined%5C..%5C/00000001',
       '/_janus/captures/payment-declined/..%2F..%2F',
-      '/_janus/captures/payment-declined/000001%00',
-      `/_janus/captures/${'a'.repeat(65)}/000001`,
+      '/_janus/captures/payment-declined/00000001%00',
+      `/_janus/captures/${'a'.repeat(65)}/00000001`,
       '/_janus/captures/payment-declined/0000001',
     ]) {
       const response = await fetch(`${server.url}${target}`);
@@ -770,17 +836,17 @@ describe('recording through the server', () => {
       { method: 'GET', path: '/v1/products/{productId}', upstream: upstream.url },
     ]);
     await fetch(`${server.url}/v1/products/p-1`, { headers: record() });
-    const exchange = join(captures, 'payment-declined', '000001');
+    const exchange = join(captures, 'payment-declined', '00000001');
     await writeFile(join(root, 'outside.json'), '{"outside":true}');
     await rm(join(exchange, 'request.json'));
     await link(join(root, 'outside.json'), join(exchange, 'request.json'));
-    const detail = (await (await fetch(`${server.url}/_janus/captures/payment-declined/000001`)).json()) as {
+    const detail = (await (await fetch(`${server.url}/_janus/captures/payment-declined/00000001`)).json()) as {
       request: { state: string };
     };
     expect(detail.request.state).toBe('unreadable');
     await rename(exchange, `${exchange}-real`);
     await symlink(`${exchange}-real`, exchange);
-    const linked = (await (await fetch(`${server.url}/_janus/captures/payment-declined/000001`)).json()) as {
+    const linked = (await (await fetch(`${server.url}/_janus/captures/payment-declined/00000001`)).json()) as {
       request: { state: string };
       response: { state: string };
     };
@@ -810,7 +876,7 @@ describe('recording through the server', () => {
     await read('event: capture');
     controller.abort();
     expect(text).toContain(
-      'event: capture\ndata: {"id":"payment-declined/000001","scenario":"payment-declined","outcome":"captured"}\n\n',
+      'event: capture\ndata: {"id":"payment-declined/00000001","scenario":"payment-declined","outcome":"captured"}\n\n',
     );
   });
 });
@@ -818,44 +884,33 @@ describe('recording through the server', () => {
 describe('the capture store', () => {
   const quiet = { error: () => undefined };
 
-  it('never shares an exchange number between two processes, and never reuses one', async () => {
+  it('claims a distinct ID for each exchange, also across stores, skipping one that exists', async () => {
     const captures = join(root, 'captures');
-    await mkdir(captures);
+    await mkdir(join(captures, 'payment-declined', '00000001'), { recursive: true });
     const [a, b] = await Promise.all([CaptureStore.open(captures, quiet), CaptureStore.open(captures, quiet)]);
     const claims = await Promise.all(
       Array.from({ length: 20 }, (_, index) => (index % 2 === 0 ? a : b).claim('payment-declined')),
     );
-    const numbers = claims.map((claim) => claim.exchange).sort();
-    expect(new Set(numbers).size).toBe(20);
-    expect(numbers.at(-1)).toBe('000020');
-    // A failed exchange keeps its empty directory, so a restarted process continues after it.
-    await a.fail(claims[0] ?? { scenario: 'payment-declined', exchange: '000001' }, {
-      exchange: claims[0]?.exchange ?? '',
-      at: '2026-10-03T00:00:00.000Z',
-      method: 'GET',
-      target: '/',
-      registration: '/',
-      outcome: 'upstream-failed',
-      durationMs: 1,
-    });
-    const restarted = await CaptureStore.open(captures, quiet);
-    expect((await restarted.claim('payment-declined')).exchange).toBe('000021');
+    const claimed = claims.map((claim) => claim.exchange);
+    expect(new Set(claimed).size).toBe(20);
+    expect(claimed).not.toContain('00000001');
+    expect(await exchanges(captures, 'payment-declined')).toHaveLength(21);
   });
 
   it('reports exchanges with no log line once they are older than the timeout', async () => {
     const captures = join(root, 'captures');
-    await mkdir(join(captures, 'default', '000001'), { recursive: true });
-    await mkdir(join(captures, 'default', '000002'));
-    await mkdir(join(captures, 'default', '000003'));
+    await mkdir(join(captures, 'default', '00000001'), { recursive: true });
+    await mkdir(join(captures, 'default', '00000002'));
+    await mkdir(join(captures, 'default', '00000003'));
     await writeFile(
       join(captures, 'default', 'log.jsonl'),
-      '{"exchange":"000003","at":"x","method":"GET","target":"/","registration":"/","outcome":"upstream-failed","durationMs":1}\n',
+      '{"exchange":"00000003","at":"x","method":"GET","target":"/","registration":"/","outcome":"upstream-failed","durationMs":1}\n',
     );
     const old = new Date(Date.now() - 60_000);
-    await utimes(join(captures, 'default', '000001'), old, old);
+    await utimes(join(captures, 'default', '00000001'), old, old);
     const store = await CaptureStore.open(captures, quiet);
     const incomplete = await store.incomplete(30_000, Date.now() + 60_000);
-    expect(incomplete.map((entry) => entry.exchange)).toEqual(['000001', '000002']);
+    expect(incomplete.map((entry) => entry.exchange)).toEqual(['00000001', '00000002']);
     expect((await store.incomplete(30_000)).map((entry) => entry.exchange)).toEqual([]);
   });
 });

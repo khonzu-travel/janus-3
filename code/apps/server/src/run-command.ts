@@ -117,7 +117,7 @@ export async function runCommand(args: RunArgs, env: CommandOutput): Promise<num
   }
 }
 
-/** `✓ 010-create-cart  POST https://…  201  84 ms  cart/000001`. */
+/** `✓ 010-create-cart  POST https://…  201  84 ms  cart/3f9a0c1e`. */
 export function stepLine(step: StepResult): string {
   const name = step.requestId.slice(step.requestId.lastIndexOf('/') + 1);
   if (step.outcome === 'not-run') return `- ${name.padEnd(22)} not run\n`;

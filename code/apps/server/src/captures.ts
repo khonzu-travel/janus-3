@@ -1,5 +1,6 @@
+import { randomBytes } from 'node:crypto';
 import { constants, type Stats } from 'node:fs';
-import { lstat, mkdir, open, readdir, realpath, unlink, type FileHandle } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, realpath, rename, rm, unlink, type FileHandle } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
@@ -8,6 +9,7 @@ import {
   EXCHANGE_PATTERN,
   formatCaptureLogLine,
   isScenarioName,
+  parseCaptureLogLine,
   type CaptureFailureEntry,
   type CaptureLog,
   type CaptureLogEntry,
@@ -39,6 +41,8 @@ export interface CaptureReader {
   ): Promise<{ readonly entry: CaptureLogEntry; readonly files: ReadonlyMap<string, Uint8Array | null> } | null>;
   /** Subscribes to `capture` events; returns the unsubscribe function. */
   subscribe(listener: (event: CaptureEvent) => void): () => void;
+  /** Deletes an exchange's log lines and directory; false when the log has no line for it. */
+  delete(scenario: string, exchange: string): Promise<boolean>;
 }
 
 /** Reports problems the caller never sees: a claim, write or log failure. */
@@ -47,7 +51,8 @@ export interface CaptureLogger {
 }
 
 const LOG_FILE = 'log.jsonl';
-const MAX_EXCHANGE = 999_999;
+/** Exclusive creates tried before a claim gives up; each collision is one in four billion. */
+const MAX_CLAIM_ATTEMPTS = 8;
 const FILE_MODE = 0o644;
 /** No-follow where the platform has it. */
 const NOFOLLOW = constants.O_NOFOLLOW;
@@ -68,9 +73,9 @@ export class CaptureStore implements CaptureSink, CaptureReader {
   readonly #root: string;
   readonly #identity: { readonly dev: number; readonly ino: number };
   readonly #logger: CaptureLogger;
-  /** The next number to try per scenario; the exclusive create decides. */
-  readonly #next = new Map<string, number>();
   readonly #listeners = new Set<(event: CaptureEvent) => void>();
+  /** Per scenario, the last queued change of its log: appends and deletes run one at a time. */
+  readonly #logQueue = new Map<string, Promise<unknown>>();
 
   private constructor(root: string, identity: Stats, logger: CaptureLogger) {
     this.#root = root;
@@ -90,19 +95,17 @@ export class CaptureStore implements CaptureSink, CaptureReader {
     try {
       if (!isScenarioName(scenario)) throw new CaptureIntegrityError('invalid scenario name');
       const directory = await this.#scenarioDirectory(scenario, true);
-      let number = this.#next.get(scenario) ?? (await this.#highest(directory)) + 1;
-      for (;;) {
-        if (number > MAX_EXCHANGE) throw new CaptureIntegrityError('the scenario has no exchange numbers left');
-        const exchange = String(number).padStart(6, '0');
+      // Random, so an ID cannot be guessed from another; the exclusive create rules out a duplicate.
+      for (let attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt++) {
+        const exchange = randomBytes(4).toString('hex');
         try {
           await mkdir(join(directory, exchange));
-          this.#next.set(scenario, number + 1);
           return Object.freeze({ scenario, exchange });
         } catch (error) {
           if (code(error) !== 'EEXIST') throw error;
-          number++;
         }
       }
+      throw new CaptureIntegrityError('no free exchange ID was found');
     } catch (error) {
       this.#logger.error('capture-claim-failed', { scenario, reason: reason(error) });
       throw error;
@@ -191,6 +194,29 @@ export class CaptureStore implements CaptureSink, CaptureReader {
   }
 
   /**
+   * Deletes an exchange: its lines leave the log first, so the list never
+   * shows a capture whose files are gone, then its directory is removed.
+   */
+  async delete(scenario: string, exchange: string): Promise<boolean> {
+    if (!isScenarioName(scenario) || !EXCHANGE_PATTERN.test(exchange)) return false;
+    const directory = await this.#scenarioDirectory(scenario, false).catch(() => null);
+    if (directory === null) return false;
+    const found = await this.#queued(scenario, async () => {
+      const path = join(directory, LOG_FILE);
+      const bytes = await readRegular(path);
+      if (bytes === null) return false;
+      const lines = splitLines(bytes);
+      const kept = lines.filter((line) => parseCaptureLogLine(line)?.exchange !== exchange);
+      if (kept.length === lines.length) return false;
+      await replaceFile(path, kept.map((line) => `${line}\n`).join(''));
+      return true;
+    });
+    // Removes a planted link itself, never what it points to.
+    if (found) await rm(join(directory, exchange), { recursive: true, force: true });
+    return found;
+  }
+
+  /**
    * Exchange directories with no log line, except those
    * created within `recentMs`, which another process may still be recording.
    */
@@ -202,7 +228,7 @@ export class CaptureStore implements CaptureSink, CaptureReader {
       const logged = new Set<string>();
       const bytes = await readRegular(join(directory, LOG_FILE));
       for (const line of bytes === null ? [] : splitLines(bytes)) {
-        const exchange = (/"exchange":"([0-9]{6})"/.exec(line) ?? [])[1];
+        const exchange = (/"exchange":"([0-9a-f]{8}|[0-9]{6})"/.exec(line) ?? [])[1];
         if (exchange !== undefined) logged.add(exchange);
       }
       for (const exchange of (await readdir(directory).catch(() => []))
@@ -233,8 +259,22 @@ export class CaptureStore implements CaptureSink, CaptureReader {
     }
   }
 
+  /** Runs `change` after every earlier change of the scenario's log. */
+  #queued<T>(scenario: string, change: () => Promise<T>): Promise<T> {
+    const result = (this.#logQueue.get(scenario) ?? Promise.resolve()).then(change, change);
+    this.#logQueue.set(
+      scenario,
+      result.catch(() => undefined),
+    );
+    return result;
+  }
+
   /** One append per line, after every file of the exchange is flushed. */
   async #append(scenario: string, line: string): Promise<void> {
+    await this.#queued(scenario, () => this.#appendNow(scenario, line));
+  }
+
+  async #appendNow(scenario: string, line: string): Promise<void> {
     const directory = await this.#scenarioDirectory(scenario, false);
     const path = join(directory, LOG_FILE);
     const existing = await lstat(path).catch(() => null);
@@ -284,15 +324,6 @@ export class CaptureStore implements CaptureSink, CaptureReader {
     if (!info.isDirectory()) throw new CaptureIntegrityError('an exchange entry is not a directory');
     return directory;
   }
-
-  /** The highest exchange number present in a scenario directory, or 0. */
-  async #highest(directory: string): Promise<number> {
-    let highest = 0;
-    for (const name of await readdir(directory)) {
-      if (EXCHANGE_PATTERN.test(name)) highest = Math.max(highest, Number(name));
-    }
-    return highest;
-  }
 }
 
 /** Writes every byte, flushes, and closes. */
@@ -307,6 +338,19 @@ async function writeAll(handle: FileHandle, bytes: Uint8Array): Promise<void> {
   } finally {
     await handle.close();
   }
+}
+
+/** Writes `text` to a new file beside `path`, then renames it over `path`, so a reader sees one or the other. */
+async function replaceFile(path: string, text: string): Promise<void> {
+  const existing = await lstat(path).catch(() => null);
+  if (existing !== null && (!existing.isFile() || existing.nlink !== 1)) {
+    throw new CaptureIntegrityError('the scenario log is not a regular file');
+  }
+  const temporary = `${path}.tmp`;
+  await rm(temporary, { force: true });
+  const handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NOFOLLOW, FILE_MODE);
+  await writeAll(handle, new TextEncoder().encode(text));
+  await rename(temporary, path);
 }
 
 /** A regular file with one link, opened without following links; null otherwise. */
@@ -417,5 +461,9 @@ export class LazyCaptureStore implements CaptureSink, CaptureReader {
   subscribe(listener: (event: CaptureEvent) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
+  }
+
+  async delete(scenario: string, exchange: string): Promise<boolean> {
+    return (await this.#get(false))?.delete(scenario, exchange) ?? false;
   }
 }

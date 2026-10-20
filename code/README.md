@@ -744,7 +744,7 @@ recording:
 curl -X POST -H 'X-Mock-Record: true' -H 'X-Mock-Scenario: payment-declined' \
   -H 'Content-Type: application/json' -d '{"sku":"s-1"}' \
   http://127.0.0.1:4010/v1/carts/c-9/items
-# → the upstream's answer, relayed, with X-Mock-Recorded: payment-declined/000001
+# → the upstream's answer, relayed, with X-Mock-Recorded: payment-declined/3f9a0c1e
 ```
 
 - **Opt-in per request.** Only `X-Mock-Record: true` forwards; `false` or no
@@ -773,7 +773,7 @@ curl -X POST -H 'X-Mock-Record: true' -H 'X-Mock-Scenario: payment-declined' \
   `X-Mock-Recorded: <scenario>/<exchange>` (or `failed`).
 - **Failures**: `501 recording-unavailable` (no upstream or capture store in
   this mode), `503 recording-busy` (`recording.maxConcurrent` exchanges, default
-  4, are in flight), `500 recording-capture-failed` (no exchange number could
+  4, are in flight), `500 recording-capture-failed` (no exchange ID could
   be claimed; nothing is forwarded), `502 recording-upstream-failed` (DNS,
   connection or TLS), `504 recording-upstream-timeout` (`recording.timeoutMs`,
   default 30000, over the whole exchange) and `502 recording-response-too-large`
@@ -797,7 +797,7 @@ The capture layout, one directory per scenario and one per exchange:
 captures/
 └── payment-declined/
     ├── log.jsonl              one line per exchange, in the order they completed
-    └── 000001/
+    └── 3f9a0c1e/
         ├── request.json       the request as received: method, target, params, headers, body
         ├── 402.json           the response body, named like a fixture response file
         ├── 402.headers.json   the response headers a fixture sidecar can hold, Set-Cookie included
@@ -806,9 +806,17 @@ captures/
 
 Captures hold whatever the exchange carried, credentials included, with no
 redaction. Keep them out of version control: add `captures/` to
-`.gitignore`. Exchange numbers are claimed before the upstream call and never
-reused, also across restarts and processes sharing the directory; a failed
-exchange keeps its empty directory and a log line saying why.
+`.gitignore`. Each exchange gets a random ID of eight hex digits, claimed by
+creating its directory before the upstream call, so one ID cannot be guessed
+from another and processes sharing the directory never share one. Captures
+made by older versions keep their six-digit numbers and are read as before. A
+failed exchange keeps its empty directory and a log line saying why.
+
+`DELETE /_janus/captures/<scenario>/<exchange>` deletes a capture, a failed
+one too: its log lines go first, then its directory. Files promoted from it
+are copies and stay as they are; `GET /_janus/promotions` marks them
+`captureExists: false`, and the UI shows the capture as deleted. Nothing records
+deletions: a capture that is gone simply does not exist.
 
 ### Promotion
 
@@ -825,7 +833,7 @@ ids:
 
 ```sh
 curl -X POST -H 'Content-Type: application/json' http://127.0.0.1:4010/_janus/promotions \
-     -d '{"capture":"payment-declined/000001","ids":{"paymentId":"pay_8f2e91c0"}}'
+     -d '{"capture":"payment-declined/3f9a0c1e","ids":{"paymentId":"pay_8f2e91c0"}}'
 # → 201, files written, snapshot reloaded
 ```
 
@@ -833,7 +841,7 @@ curl -X POST -H 'Content-Type: application/json' http://127.0.0.1:4010/_janus/pr
 data/payment-declined/v1/payments/POST/
 ├── 402.json            "id": "{{$scenario.ids.paymentId}}"
 ├── 402.headers.json
-└── 402.meta.json       capture payment-declined/000001, review: pending
+└── 402.meta.json       capture payment-declined/3f9a0c1e, review: pending
 ```
 
 - **The request**: `capture` (required), and optionally `scenario` (default:
@@ -1306,25 +1314,25 @@ headers only for the origins in `cors.origins`, and refuses a browser's
 [Cross-origin access](#cross-origin-access). `/_janus/ui/` serves the
 [Atlas UI](#atlas-ui) and is not an Atlas resource.
 
-| Resource                                            | Returns                                                                                                                       |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `GET /_janus/health`                                | `status`, `snapshotVersion` (and `snapshot`), counts, `configDigest`, `warnings`, `capabilities`, `lastReload`                |
-| `GET /_janus/config`                                | The effective settings and where each value came from                                                                         |
-| `GET /_janus/endpoints`                             | Every path template + method, with `pathParameters`, `origin` and `detailHref` links; `?scenario=<name>` for another scenario |
-| `GET /_janus/scenarios`                             | Every scenario: `extends`, `chain`, `ids`, `overrides`, `removes`, endpoint counts and an `endpointsHref`                     |
-| `GET` / `POST` / `PATCH` / `DELETE /_janus/session` | The caller's session, with its `sequences` positions and `replays` count; see [Sessions](#sessions)                           |
-| `DELETE /_janus/sequences`                          | Restarts the caller's sequence positions; see [Choosing between responses](#choosing-between-responses)                       |
-| `GET /_janus/endpoints/<id>?at=<version>`           | One endpoint: its responses, `representationGroups`, `accepts`, `controls`, `origin` and the scenario `matrix`                |
-| `GET /_janus/fixtures/<id>?at=<version>`            | One response: status, media types, headers, body preview, `dynamic` and `tokens`                                              |
-| `GET /_janus/clock`                                 | The instant a request would render against, its mode and source, timezone and seed                                            |
-| `POST /_janus/resolve`                              | What Janus would answer for a request, and why: a simulation that serves nothing                                              |
-| `GET` / `POST /_janus/reload`                       | The last reload result / reload now and wait for the result                                                                   |
-| `GET /_janus/events`                                | Server-sent events announcing snapshot changes and failed reloads                                                             |
-| `GET /_janus/recording`                             | The recording registrations and limits, and whether this server can record                                                    |
-| `GET /_janus/captures`                              | Recorded exchanges, newest first; `?scenario=`, `?outcome=`, `?limit=` (1–500) and `?before=` to page                         |
-| `GET /_janus/captures/<scenario>/<exchange>`        | One capture: the request, the response with a `modified` flag, its provenance and `promotedTo`                                |
-| `GET` / `POST /_janus/promotions`                   | Promoted files, newest first (`?review=`, `?scenario=`, `pending`) / promote a capture; see [Promotion](#promotion)           |
-| `POST /_janus/promotions/review`                    | Marks promoted files reviewed against their current digests                                                                   |
+| Resource                                                | Returns                                                                                                                       |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `GET /_janus/health`                                    | `status`, `snapshotVersion` (and `snapshot`), counts, `configDigest`, `warnings`, `capabilities`, `lastReload`                |
+| `GET /_janus/config`                                    | The effective settings and where each value came from                                                                         |
+| `GET /_janus/endpoints`                                 | Every path template + method, with `pathParameters`, `origin` and `detailHref` links; `?scenario=<name>` for another scenario |
+| `GET /_janus/scenarios`                                 | Every scenario: `extends`, `chain`, `ids`, `overrides`, `removes`, endpoint counts and an `endpointsHref`                     |
+| `GET` / `POST` / `PATCH` / `DELETE /_janus/session`     | The caller's session, with its `sequences` positions and `replays` count; see [Sessions](#sessions)                           |
+| `DELETE /_janus/sequences`                              | Restarts the caller's sequence positions; see [Choosing between responses](#choosing-between-responses)                       |
+| `GET /_janus/endpoints/<id>?at=<version>`               | One endpoint: its responses, `representationGroups`, `accepts`, `controls`, `origin` and the scenario `matrix`                |
+| `GET /_janus/fixtures/<id>?at=<version>`                | One response: status, media types, headers, body preview, `dynamic` and `tokens`                                              |
+| `GET /_janus/clock`                                     | The instant a request would render against, its mode and source, timezone and seed                                            |
+| `POST /_janus/resolve`                                  | What Janus would answer for a request, and why: a simulation that serves nothing                                              |
+| `GET` / `POST /_janus/reload`                           | The last reload result / reload now and wait for the result                                                                   |
+| `GET /_janus/events`                                    | Server-sent events announcing snapshot changes and failed reloads                                                             |
+| `GET /_janus/recording`                                 | The recording registrations and limits, and whether this server can record                                                    |
+| `GET /_janus/captures`                                  | Recorded exchanges, newest first; `?scenario=`, `?outcome=`, `?limit=` (1–500) and `?before=` to page                         |
+| `GET` / `DELETE /_janus/captures/<scenario>/<exchange>` | One capture: the request, the response with a `modified` flag, its provenance and `promotedTo` / delete it                    |
+| `GET` / `POST /_janus/promotions`                       | Promoted files, newest first (`?review=`, `?scenario=`, `pending`) / promote a capture; see [Promotion](#promotion)           |
+| `POST /_janus/promotions/review`                        | Marks promoted files reviewed against their current digests                                                                   |
 
 - **IDs** (`ep_…`, `fx_…`) come from the logical identity: scenario, method,
   and path template, plus the locale and file-name media type for a response.
@@ -1665,8 +1673,8 @@ never is. A result from an older snapshot is labelled stale, with **Re-run**. Wi
 scenario or all of them, filtered by outcome and paged. New captures appear as
 they are logged and are announced without moving focus. Each captured
 exchange opens its request, response (with a note when the file was edited
-since) and provenance. The page only reads: nothing in it changes, moves or
-deletes a capture. The Configuration dialog has a **Recording** section listing
+since) and provenance. A capture is deleted, after a confirmation, with the
+trash button on its row or on its own page. The Configuration dialog has a **Recording** section listing
 each registration as a sentence, and the explorer accepts `X-Mock-Record`,
 showing the registration, the URL that would be requested and the headers that
 would be forwarded, with nothing sent.

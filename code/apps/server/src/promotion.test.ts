@@ -1,3 +1,4 @@
+import type * as NodeCrypto from 'node:crypto';
 import type * as FsPromises from 'node:fs/promises';
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { createServer, type ServerResponse } from 'node:http';
@@ -11,6 +12,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FsFixtureWriter } from './fixture-writer.js';
 import { main, type CliEnvironment } from './main.js';
 import { startServer, type RunningServer, type ServeLogger } from './serve.js';
+
+// Capture IDs are random; these tests number them 00000001, 00000002, … in claim order instead.
+const ids = vi.hoisted(() => ({ next: 0 }));
+vi.mock('node:crypto', async (original) => {
+  const actual = await original<typeof NodeCrypto>();
+  return {
+    ...actual,
+    randomBytes: (size: number) =>
+      size === 4 ? Buffer.from((++ids.next).toString(16).padStart(8, '0'), 'hex') : actual.randomBytes(size),
+  };
+});
 
 const writeHooks = vi.hoisted(() => ({
   beforeHeaders: null as (() => Promise<void>) | null,
@@ -40,6 +52,7 @@ const logs: string[] = [];
 const WATCH_WAIT = { timeout: 5000, interval: 50 };
 
 beforeEach(async () => {
+  ids.next = 0;
   root = await mkdtemp(join(tmpdir(), 'janus-promotion-'));
   closers = [];
   logs.length = 0;
@@ -168,6 +181,7 @@ interface Doc {
     readonly file: string;
     readonly path: string;
     readonly detailHref: string;
+    readonly captureExists: boolean;
   }[];
   readonly fixtures: readonly { readonly digest: string }[];
   readonly promotedTo: readonly unknown[];
@@ -221,14 +235,14 @@ describe('the acceptance journey', () => {
     const product = await fetch(`${server.url}/v1/products/p-8812`, {
       headers: { 'x-mock-record': 'true', 'x-mock-scenario': 'payment-declined' },
     });
-    expect(product.headers.get('x-mock-recorded')).toBe('payment-declined/000001');
+    expect(product.headers.get('x-mock-recorded')).toBe('payment-declined/00000001');
     const payment = await recordPayment(server);
     expect(payment.status).toBe(402);
-    expect(payment.headers.get('x-mock-recorded')).toBe('payment-declined/000002');
+    expect(payment.headers.get('x-mock-recorded')).toBe('payment-declined/00000002');
     expect(payment.headers.get('x-mock-promoted')).toBeNull();
 
     // 3. A dry run shows the exact rewrites in the body and Location; then promote.
-    const request = { capture: 'payment-declined/000002', ids: { paymentId: upstream.payment.id } };
+    const request = { capture: 'payment-declined/00000002', ids: { paymentId: upstream.payment.id } };
     const planned = await post(server, '/_janus/promotions', { ...request, dryRun: true });
     expect(planned.status).toBe(200);
     expect(planned.body).toMatchObject({ outcome: 'planned', applicable: true, conflicts: [] });
@@ -269,7 +283,7 @@ describe('the acceptance journey', () => {
     expect(paid.status).toBe(201);
 
     // The capture links to the files promoted from it.
-    const capture = await get(server, '/_janus/captures/payment-declined/000002');
+    const capture = await get(server, '/_janus/captures/payment-declined/00000002');
     expect(capture.promotedTo).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ scenario: 'payment-declined', file: '/v1/payments/POST/402.json' }),
@@ -278,7 +292,7 @@ describe('the acceptance journey', () => {
 
     // 5. Promoting the product into default meets the hand-written file.
     const conflict = await post(server, '/_janus/promotions', {
-      capture: 'payment-declined/000001',
+      capture: 'payment-declined/00000001',
       scenario: 'default',
     });
     expect(conflict.status).toBe(409);
@@ -295,7 +309,7 @@ describe('the acceptance journey', () => {
     const detail = await get(server, `/_janus/${productItem?.detailHref ?? ''}`);
     const digest = detail.fixtures[0]?.digest;
     const replaced = await post(server, '/_janus/promotions', {
-      capture: 'payment-declined/000001',
+      capture: 'payment-declined/00000001',
       scenario: 'default',
       replace: [{ file: '/v1/products/{productId}/GET/200.json', digest }],
     });
@@ -354,14 +368,31 @@ describe('promotion through the server', () => {
     const server = await janus(endpoints(upstream.url), { tree: TREE });
     await recordPayment(server);
     const results = await Promise.all([
-      post(server, '/_janus/promotions', { capture: 'payment-declined/000001' }),
-      post(server, '/_janus/promotions', { capture: 'payment-declined/000001' }),
+      post(server, '/_janus/promotions', { capture: 'payment-declined/00000001' }),
+      post(server, '/_janus/promotions', { capture: 'payment-declined/00000001' }),
     ]);
     expect(results.map((result) => result.status).sort()).toEqual([201, 409]);
     expect(results.find((result) => result.status === 409)?.body.error.conflicts[0]).toMatchObject({
       kind: 'promoted',
       reason: 'exists',
     });
+  });
+
+  it('keeps promoted files when their capture is deleted, and says it no longer exists', async () => {
+    const upstream = await fakeUpstream();
+    const server = await janus(endpoints(upstream.url), { tree: TREE });
+    await recordPayment(server);
+    expect((await post(server, '/_janus/promotions', { capture: 'payment-declined/00000001' })).status).toBe(201);
+    const before = await get(server, '/_janus/promotions');
+    expect(before.items.map((item) => item.captureExists)).toEqual(before.items.map(() => true));
+    const file = join(data(), 'payment-declined/v1/payments/POST/402.json');
+    const content = await readFile(file, 'utf8');
+    const deleted = await fetch(`${server.url}/_janus/captures/payment-declined/00000001`, { method: 'DELETE' });
+    expect(deleted.status).toBe(204);
+    const after = await get(server, '/_janus/promotions');
+    expect(after.items.length).toBe(before.items.length);
+    expect(after.items.map((item) => item.captureExists)).toEqual(after.items.map(() => false));
+    expect(await readFile(file, 'utf8')).toBe(content);
   });
 
   it('auto-promotes a capture, refreshes its own promoted file, and marks it pending', async () => {
@@ -375,7 +406,7 @@ describe('promotion through the server', () => {
     const meta = JSON.parse(
       await readFile(join(data(), 'payment-declined/v1/payments/POST/402.meta.json'), 'utf8'),
     ) as { files: Record<string, { capture: string; review: string }> };
-    expect(meta.files['402.json']).toMatchObject({ capture: 'payment-declined/000002', review: 'pending' });
+    expect(meta.files['402.json']).toMatchObject({ capture: 'payment-declined/00000002', review: 'pending' });
     const health = await get(server, '/_janus/health');
     expect(health.capabilities.promotion).toMatchObject({ available: true, mode: 'auto' });
     expect(health.capabilities.promotion.pending).toBeGreaterThan(0);
@@ -384,16 +415,19 @@ describe('promotion through the server', () => {
   it('refuses unknown captures, unknown scenarios and bad bodies', async () => {
     const upstream = await fakeUpstream();
     const server = await janus(endpoints(upstream.url), { tree: TREE });
-    expect((await post(server, '/_janus/promotions', { capture: 'payment-declined/000009' })).status).toBe(404);
+    expect((await post(server, '/_janus/promotions', { capture: 'payment-declined/00000009' })).status).toBe(404);
     expect((await post(server, '/_janus/promotions', { capture: 'nope' })).status).toBe(404);
-    expect((await post(server, '/_janus/promotions', { capture: 'payment-declined/000001', extra: 1 })).status).toBe(
+    expect((await post(server, '/_janus/promotions', { capture: 'payment-declined/00000001', extra: 1 })).status).toBe(
       400,
     );
     await recordPayment(server);
-    const unknown = await post(server, '/_janus/promotions', { capture: 'payment-declined/000001', scenario: 'ghost' });
+    const unknown = await post(server, '/_janus/promotions', {
+      capture: 'payment-declined/00000001',
+      scenario: 'ghost',
+    });
     expect(unknown).toMatchObject({ status: 400, body: { error: { code: 'unknown-scenario' } } });
     const unknownId = await post(server, '/_janus/promotions', {
-      capture: 'payment-declined/000001',
+      capture: 'payment-declined/00000001',
       ids: { orderId: 'x-1234' },
     });
     expect(unknownId).toMatchObject({ status: 422, body: { error: { code: 'promotion-unknown-id' } } });
@@ -413,7 +447,7 @@ describe('promotion through the server', () => {
     );
     if (!result.ok) throw new Error('not started');
     closers.push(() => result.server.close());
-    const answer = await post(result.server, '/_janus/promotions', { capture: 'default/000001' });
+    const answer = await post(result.server, '/_janus/promotions', { capture: 'default/00000001' });
     expect(answer).toMatchObject({ status: 501, body: { error: { code: 'promotion-unavailable' } } });
     expect((await get(result.server, '/_janus/health')).capabilities.promotion).toEqual({
       available: false,
@@ -581,7 +615,7 @@ describe('promotion and reload coordination', () => {
     const upstream = await fakeUpstream();
     const server = await janus(endpoints(upstream.url), { tree: TREE, watch: true });
     await recordPayment(server);
-    expect((await post(server, '/_janus/promotions', { capture: 'payment-declined/000001' })).status).toBe(201);
+    expect((await post(server, '/_janus/promotions', { capture: 'payment-declined/00000001' })).status).toBe(201);
     expect(logs.find((line) => line.startsWith('reload-started '))).toBe('reload-started {"triggers":"promotion"}');
     await vi.waitFor(() => {
       expect(logs).toContain('reload-started {"triggers":"watch"}');
@@ -610,7 +644,7 @@ describe('promotion and reload coordination', () => {
       markEntered();
       await release;
     };
-    const promotion = post(server, '/_janus/promotions', { capture: 'payment-declined/000001' });
+    const promotion = post(server, '/_janus/promotions', { capture: 'payment-declined/00000001' });
     await entered;
     const request = fetch(`${server.url}/_janus/reload`, { method: 'POST' });
     try {
@@ -664,7 +698,7 @@ it('serves an edit made while a watched review is rolled back', async () => {
   const upstream = await fakeUpstream();
   const server = await janus(endpoints(upstream.url), { tree: TREE, watch: true });
   await recordPayment(server);
-  await post(server, '/_janus/promotions', { capture: 'payment-declined/000001' });
+  await post(server, '/_janus/promotions', { capture: 'payment-declined/00000001' });
   const response = join(data(), 'payment-declined/v1/payments/POST/402.json');
   const digest = fileDigest(await readFile(response));
   writeHooks.beforeMetadata = async () => {

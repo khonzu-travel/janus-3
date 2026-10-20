@@ -226,6 +226,17 @@ export function useCapture(detailUrl: string | null): UseQueryResult<CaptureDeta
   });
 }
 
+/** Refetches every capture list and detail, after a capture was deleted. */
+export function useCapturesChanged(): () => Promise<void> {
+  const { generation } = useAtlasSession();
+  const queryClient = useQueryClient();
+  return () =>
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey[1] === generation && (query.queryKey[2] === 'captures' || query.queryKey[2] === 'capture'),
+    });
+}
+
 /** Promoted files, from the snapshot `health` reports; disabled unless the server can promote. */
 export function usePromotions(health: Health | undefined, query: PromotionQuery): UseQueryResult<PromotionList> {
   const { client, generation } = useAtlasSession();

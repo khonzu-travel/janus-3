@@ -111,7 +111,7 @@ export function openSnapshotFeed(options: SnapshotFeedOptions): () => void {
 }
 
 const version = /^[0-9a-f]{16}$/;
-const CAPTURE_ID = /^[a-z0-9]+(-[a-z0-9]+)*\/[0-9]{6}$/;
+const CAPTURE_ID = /^[a-z0-9]+(-[a-z0-9]+)*\/(?:[0-9a-f]{8}|[0-9]{6})$/;
 const RUN_ID = /^r-[0-9]{6,}$/;
 
 /** Decodes one event's data; a malformed event is ignored rather than trusted. */

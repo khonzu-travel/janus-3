@@ -88,7 +88,7 @@ export interface Upstream {
 /** A claimed exchange number. Issued only by the sink. */
 export interface CaptureReservation {
   readonly scenario: string;
-  /** Six decimal digits, e.g. `000001`. */
+  /** Eight random lowercase hex digits, e.g. `3f9a0c1e`; see `EXCHANGE_PATTERN`. */
   readonly exchange: string;
 }
 

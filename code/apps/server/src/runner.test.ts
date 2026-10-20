@@ -1,3 +1,4 @@
+import type * as NodeCrypto from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -6,7 +7,7 @@ import { createServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { gzipSync } from 'node:zlib';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { requestTokenGrammar } from '@janus/core';
 
@@ -15,10 +16,22 @@ import { main, type CliEnvironment } from './main.js';
 import { buildFromFiles, changedIds } from './requests.js';
 import type { RunningServer } from './serve.js';
 
+// Capture IDs are random; these tests number them 00000001, 00000002, … in claim order instead.
+const ids = vi.hoisted(() => ({ next: 0 }));
+vi.mock('node:crypto', async (original) => {
+  const actual = await original<typeof NodeCrypto>();
+  return {
+    ...actual,
+    randomBytes: (size: number) =>
+      size === 4 ? Buffer.from((++ids.next).toString(16).padStart(8, '0'), 'hex') : actual.randomBytes(size),
+  };
+});
+
 let root: string;
 let server: RunningServer | null = null;
 
 beforeEach(async () => {
+  ids.next = 0;
   root = await mkdtemp(join(tmpdir(), 'janus-runner-'));
 });
 
@@ -139,14 +152,14 @@ describe('runner routes', () => {
         response: { body: { value: string } };
         request: { headers: { name: string }[] };
       }[];
-      expect(step?.capture).toBe('default/000001');
+      expect(step?.capture).toBe('default/00000001');
       expect(JSON.parse(step?.response.body.value ?? '')).toEqual({
         id: 'o-7',
         path: '/api/v1/orders',
         encoding: 'identity',
       });
       expect(step?.request.headers.map((header) => header.name.toLowerCase())).not.toContain('x-mock-delay');
-      const meta = JSON.parse(await readFile(join(root, 'captures/default/000001/201.meta.json'), 'utf8')) as Record<
+      const meta = JSON.parse(await readFile(join(root, 'captures/default/00000001/201.meta.json'), 'utf8')) as Record<
         string,
         unknown
       >;
@@ -155,7 +168,7 @@ describe('runner routes', () => {
         registration: { method: 'POST', path: '/v1/orders', upstream: `http://127.0.0.1:${String(port)}/api` },
       });
       const list = await json(await fetch(`${base}/_janus/captures?source=runner`));
-      expect(list['items']).toMatchObject([{ id: 'default/000001', source: 'runner' }]);
+      expect(list['items']).toMatchObject([{ id: 'default/00000001', source: 'runner' }]);
       expect((await json(await fetch(`${base}/_janus/captures?source=recording`)))['items']).toEqual([]);
     } finally {
       await new Promise((done) => upstream.close(done));

@@ -124,12 +124,13 @@ describe('capture review page', () => {
     const plain = new FakeAtlas();
     window.location.hash = '';
     document.body.innerHTML = '';
-    renderApp(plain, '');
+    // Endpoints, not the Requests home page, whose late address fix-up would leak into the next test.
+    renderApp(plain, '#/endpoints');
     await screen.findByRole('link', { name: 'Requests' });
     expect(screen.queryByRole('link', { name: 'Captures' })).toBeNull();
   });
 
-  it('lists exchanges with their outcome, says captures are not served, and offers no changes', async () => {
+  it('lists exchanges with their outcome, says captures are not served, and offers only Delete', async () => {
     const { user } = renderApp(
       recordingAtlas(() => [
         item('000002', { outcome: 'upstream-timeout', status: undefined, detailHref: undefined }),
@@ -144,9 +145,68 @@ describe('capture review page', () => {
     expect(within(rows[2] as HTMLElement).getByRole('link', { name: '/v1/payments?attempt=000001' })).toBeDefined();
     await user.click(screen.getByRole('button', { name: 'About captures' }));
     expect(screen.getByRole('tooltip').textContent).toContain('Captures are not served.');
-    // The only controls filter and page; nothing deletes, moves or promotes.
-    const buttons = screen.queryAllByRole('button').map((button) => button.textContent);
-    expect(buttons.filter((text) => /delete|remove|promote|move/i.test(text))).toEqual([]);
+    // Besides filtering and paging, each capture can only be deleted: nothing moves or promotes.
+    const buttons = screen
+      .queryAllByRole('button')
+      .map((button) => button.getAttribute('aria-label') ?? button.textContent);
+    expect(buttons.filter((text) => /delete|remove|promote|move/i.test(text))).toEqual([
+      'Delete capture default/000002',
+      'Delete capture default/000001',
+    ]);
+  });
+
+  it('deletes a capture from its row after a confirmation', async () => {
+    let items = [
+      item('000002', { outcome: 'upstream-timeout', status: undefined, detailHref: undefined }),
+      item('000001'),
+    ];
+    const fake = recordingAtlas(() => items);
+    const deleted: string[] = [];
+    fake.extraDelete = (path) => {
+      deleted.push(path);
+      items = items.filter((entry) => `captures/${String(entry['id'])}` !== path);
+      return new Response(null, { status: 204 });
+    };
+    const { user } = renderApp(fake, '#/captures');
+    await waitFor(table);
+    await user.click(screen.getByRole('button', { name: 'Delete capture default/000002' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete capture default/000002?' });
+    expect(dialog.textContent).toContain('Files promoted from it stay.');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(deleted).toEqual([]);
+    await user.click(screen.getByRole('button', { name: 'Delete capture default/000002' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => {
+      expect(within(table()).getAllByRole('row')).toHaveLength(2);
+    });
+    expect(deleted).toEqual(['captures/default/000002']);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(window.location.hash).toMatch(/^#\/captures/);
+  });
+
+  it('deletes a capture from its page and returns to the list', async () => {
+    let items = [item('000001')];
+    const fake = recordingAtlas(() => items);
+    fake.extraDelete = (path) => {
+      items = items.filter((entry) => `captures/${String(entry['id'])}` !== path);
+      return new Response(null, { status: 204 });
+    };
+    const { user } = renderApp(fake, '#/captures/default/000001');
+    await screen.findByRole('region', { name: 'Request' });
+    await user.click(screen.getByRole('button', { name: 'Delete capture' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByRole('heading', { name: 'No captures yet' })).toBeDefined();
+    expect(window.location.hash).toMatch(/^#\/captures(\?|$)/);
+  });
+
+  it('keeps the dialog open and says why when a delete fails', async () => {
+    const fake = recordingAtlas(() => [item('000001')]);
+    fake.extraDelete = () => errorResponse(404, 'atlas-resource-not-found', 'No capture with this ID exists');
+    const { user } = renderApp(fake, '#/captures');
+    await waitFor(table);
+    await user.click(screen.getByRole('button', { name: 'Delete capture default/000001' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    expect(await within(screen.getByRole('dialog')).findByText('That did not work')).toBeDefined();
   });
 
   it('filters the page by text, and opens a capture from anywhere on its row', async () => {
@@ -263,7 +323,7 @@ describe('capture review page', () => {
       recordingAtlas(() => []),
       '#/captures/default/000009',
     );
-    expect(await screen.findByRole('heading', { name: 'No such capture' })).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'Capture does not exist' })).toBeDefined();
   });
 });
 
