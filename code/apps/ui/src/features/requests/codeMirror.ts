@@ -2,7 +2,15 @@ import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
-import { bracketMatching, HighlightStyle, indentOnInput, indentUnit, syntaxHighlighting } from '@codemirror/language';
+import {
+  bracketMatching,
+  foldGutter,
+  foldKeymap,
+  HighlightStyle,
+  indentOnInput,
+  indentUnit,
+  syntaxHighlighting,
+} from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
 import {
   drawSelection,
@@ -55,6 +63,15 @@ const theme = EditorView.theme({
     backgroundColor: 'var(--accent-soft)',
   },
   '&.cm-focused .cm-matchingBracket': { backgroundColor: 'var(--accent-soft)', outline: '1px solid var(--accent)' },
+  '.cm-foldGutter .cm-gutterElement': { padding: '0 4px', cursor: 'pointer' },
+  '.cm-foldGutter .cm-gutterElement:hover': { color: 'var(--fg)' },
+  '.cm-foldPlaceholder': {
+    backgroundColor: 'var(--hover)',
+    border: '1px solid var(--line)',
+    color: 'var(--muted)',
+    margin: '0 2px',
+    padding: '0 4px',
+  },
 });
 
 export interface ScriptEditorOptions {
@@ -69,7 +86,12 @@ export interface ScriptEditorOptions {
 /** What an editor holds: a script, a JSON body, or any other text. */
 export type EditorLanguage = 'javascript' | 'json' | 'text';
 
-const LANGUAGES = { javascript: () => [javascript()], json: () => [json()], text: () => [] } as const;
+// JSON folds at each object and array, from the gutter or with Ctrl + Shift + [ and ].
+const LANGUAGES = {
+  javascript: () => [javascript()],
+  json: () => [json(), foldGutter()],
+  text: () => [],
+} as const;
 
 export function createScriptEditor(parent: HTMLElement, options: ScriptEditorOptions): EditorView {
   return new EditorView({
@@ -92,6 +114,7 @@ export function createScriptEditor(parent: HTMLElement, options: ScriptEditorOpt
         keymap.of([
           { key: 'Tab', run: tab, shift: indentLess },
           ...closeBracketsKeymap,
+          ...foldKeymap,
           ...defaultKeymap,
           ...historyKeymap,
         ]),

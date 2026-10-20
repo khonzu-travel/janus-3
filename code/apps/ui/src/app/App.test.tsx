@@ -435,8 +435,9 @@ describe('App', () => {
         .queryAllByRole('button')
         .filter((button) => !button.hasAttribute('aria-expanded') && !button.hasAttribute('aria-pressed'))
         .map((button) => button.getAttribute('aria-label')),
-    ).toEqual([expect.stringMatching(/^Switch to (dark|light) theme$/), 'Configuration']);
-    // The theme switch, the logo, changes only this browser's display; Configuration opens the read-only settings.
+    ).toEqual([expect.stringMatching(/^Switch to (dark|light) theme$/), 'Configuration', 'Copy body']);
+    // The theme switch, the logo, changes only this browser's display; Configuration opens the read-only settings;
+    // Copy body copies the response to the clipboard.
     expect(document.querySelector('form, textarea, main select, input:not([type="search"])')).toBeNull();
     const names = screen.getAllByRole('link').map((link) => link.textContent.toLowerCase());
     for (const verb of ['edit', 'delete ', 'upload', 'promote', 'capture', 'record', 'save']) {

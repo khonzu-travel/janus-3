@@ -68,17 +68,19 @@ test('promotes a capture from the UI, serves it with the scenario ID, and marks 
   const capture = recorded.headers.get('x-mock-recorded') ?? '';
   expect(capture).toMatch(/^payment-declined\/[0-9a-f]{8}$/);
 
-  // 3. Open the capture and Promote it with paymentId bound explicitly.
+  // 3. Open the capture, bind paymentId explicitly on the page, and Promote it.
   await page.goto(`${janus.url}/_janus/ui/#/captures/${capture}?scenario=payment-declined`);
-  await page.getByRole('button', { name: 'Promote' }).click();
-  const dialog = page.getByRole('dialog', { name: new RegExp(`Promote capture ${capture}`) });
-  await expect(dialog.getByLabel('Scenario')).toBeFocused();
-  await dialog.getByRole('button', { name: 'Bind an ID' }).click();
-  await dialog.getByLabel('Captured value 1').fill('pay_8f2e91c0');
-  await expect(dialog.getByText(/exact, from you/)).toBeVisible();
+  await page.getByRole('button', { name: 'Edit before promoting' }).click();
+  const target = page.getByRole('region', { name: 'Promote to' });
+  await target.getByRole('button', { name: 'Bind an ID' }).click();
+  await target.getByLabel('Captured value 1').fill('pay_8f2e91c0');
+  await expect(target.getByText(/exact, from you/)).toBeVisible();
+  await audit(page, info, 'mouse', 'capture editing');
+  await page.getByRole('button', { name: 'Promote', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: new RegExp(`Promote capture ${capture}\\?`) });
   await expect(dialog.getByText(/replaces the captured value at \/id/)).toBeVisible();
   await expect(dialog.getByText(/replaces the captured value in the location header/)).toBeVisible();
-  await audit(page, info, 'mouse', 'promote dialog');
+  await audit(page, info, 'mouse', 'promote confirmation');
   await dialog.getByRole('button', { name: 'Promote' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText(/It is pending review/)).toBeVisible();
@@ -115,7 +117,7 @@ test('promotes a capture from the UI, serves it with the scenario ID, and marks 
   expect(Object.values(meta.files).map((entry) => entry.review)).toEqual(['reviewed', 'reviewed']);
 });
 
-test('edits the response before promoting it, and Escape cancels', async ({ page }) => {
+test('edits the response on the capture page before promoting it, and copies the body', async ({ page, context }) => {
   const recorded = await fetch(`${janus.url}/v1/payments`, {
     method: 'POST',
     headers: { 'x-mock-record': 'true', 'x-mock-scenario': 'payment-declined', 'content-type': 'application/json' },
@@ -124,24 +126,30 @@ test('edits the response before promoting it, and Escape cancels', async ({ page
   const id = recorded.headers.get('x-mock-recorded') ?? '';
   await page.goto(`${janus.url}/_janus/ui/#/captures/${id}?scenario=payment-declined`);
 
-  // Escape cancels, wherever focus is.
-  await page.getByRole('button', { name: 'Promote' }).click();
-  const dialog = page.getByRole('dialog', { name: /Promote capture/ });
-  await dialog.getByRole('button', { name: 'Edit before promoting' }).click();
-  await dialog.locator('.cm-content').click();
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-
-  await page.getByRole('button', { name: 'Promote' }).click();
-  await dialog.getByLabel(/^Variant/).fill('edited');
-  await dialog.getByRole('button', { name: 'Edit before promoting' }).click();
-  await expect(dialog.locator('.cm-content')).toContainText('"status": "declined"');
-  await dialog.locator('.cm-content').click();
+  const response = page.getByRole('region', { name: 'Response' });
+  await page.getByRole('button', { name: 'Edit before promoting' }).click();
+  await page.getByLabel(/^Variant/).fill('edited');
+  const editor = response.locator('.cm-content');
+  await expect(editor).toContainText('"status": "declined"');
+  // JSON folds from the gutter.
+  await expect(response.locator('.cm-foldGutter')).toBeVisible();
+  await editor.click();
   await page.keyboard.press('ControlOrMeta+A');
   await page.keyboard.insertText('{"status":"edited"}');
-  await dialog.getByRole('button', { name: 'Add header' }).click();
-  await dialog.getByLabel('Response headers name 2').fill('x-edited');
-  await dialog.getByLabel('Response headers value 2').fill('yes');
+  await response.getByRole('button', { name: 'Add header' }).click();
+  await response.getByLabel('Response headers name 2').fill('x-edited');
+  await response.getByLabel('Response headers value 2').fill('yes');
+
+  // Copy takes the body as edited.
+  if (test.info().project.name === 'chromium') {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await response.getByRole('button', { name: 'Copy response body' }).click();
+    const copied: string = await page.evaluate('navigator.clipboard.readText()');
+    expect(copied).toBe('{"status":"edited"}');
+  }
+
+  await page.getByRole('button', { name: 'Promote', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: /Promote capture/ });
   await expect(dialog.getByRole('button', { name: 'Promote' })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Promote' }).click();
   await expect(dialog).toBeHidden();

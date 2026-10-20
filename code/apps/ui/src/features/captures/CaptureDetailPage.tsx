@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router';
+import { Link, useBlocker, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router';
 
-import type { CaptureDetail, Health, PromotionResult } from '../../atlas/client.js';
+import type { CaptureDetail, Health, PromotionResult, Scenarios } from '../../atlas/client.js';
 import { iconButtonClass, linkClass, primaryButtonClass } from '../../components/buttonClass.js';
-import { AlertIcon, TrashIcon } from '../../components/icons.js';
+import { AlertIcon, PencilIcon, TrashIcon } from '../../components/icons.js';
 import { MethodBadge } from '../../components/MethodBadge.js';
 import { ErrorState } from '../../components/states/ErrorState.js';
 import { isNotFound } from '../../components/states/errors.js';
@@ -14,8 +14,11 @@ import type { AtlasLayoutContext } from '../../layouts/AtlasLayoutContext.js';
 import { scenarioSearch, withScenario } from '../../scenarios/selection.js';
 import { Collapsible } from '../../components/Collapsible.js';
 import { HeaderList } from '../fixtures/Preview.js';
-import { PromoteDialog } from '../promotions/PromoteDialog.js';
+import { PromoteConfirm, PromoteFields, usePromotion } from '../promotions/Promote.js';
 import { ReviewPill } from '../promotions/PromotionsPage.js';
+import { CodeEditor } from '../requests/CodeEditor.js';
+import { NameValueTable } from '../requests/fields.js';
+import { CloseIcon } from '../requests/icons.js';
 import { BodyView } from '../requests/JsonTree.js';
 import { ConfirmDialog } from '../requests/RequestWorkspace.js';
 import { DeleteCaptureText } from './CapturesPage.js';
@@ -41,8 +44,7 @@ export function CaptureDetailPage() {
   const id = `${scenario}/${exchange}`;
   const url = client.captureUrl(id);
   const capture = useCapture(url);
-  // Kept here, not in the detail, so they survive the refetch a promotion starts.
-  const [promoting, setPromoting] = useState(false);
+  // Kept here, not in the detail, so it survives the refetch a promotion starts.
   const [promoted, setPromoted] = useState<PromotionResult | null>(null);
   const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
@@ -74,14 +76,17 @@ export function CaptureDetailPage() {
       <Detail
         capture={capture.data}
         health={health}
-        onPromote={
-          health.capabilities.promotion.available && capture.data.response.state === 'available'
-            ? () => {
-                setPromoted(null);
-                setPromoting(true);
-              }
-            : null
-        }
+        scenarios={scenarios}
+        canPromote={health.capabilities.promotion.available && capture.data.response.state === 'available'}
+        onPromoting={() => {
+          setPromoted(null);
+        }}
+        onPromoted={(result) => {
+          setPromoted(result);
+          // The tree changed: refetch in the background, so every view moves to the new snapshot.
+          refresh();
+        }}
+        deleting={deleting}
         onDelete={() => {
           setDeleting(true);
         }}
@@ -108,21 +113,6 @@ export function CaptureDetailPage() {
         </p>
       )}
       {body}
-      {promoting && capture.data !== undefined ? (
-        <PromoteDialog
-          capture={capture.data}
-          scenarios={scenarios}
-          onClose={() => {
-            setPromoting(false);
-          }}
-          onPromoted={(result) => {
-            setPromoting(false);
-            setPromoted(result);
-            // The tree changed: refetch in the background, so every view moves to the new snapshot.
-            refresh();
-          }}
-        />
-      ) : null}
       {deleting ? (
         <ConfirmDialog
           title={`Delete capture ${id}?`}
@@ -146,18 +136,43 @@ export function CaptureDetailPage() {
 function Detail({
   capture,
   health,
-  onPromote,
+  scenarios,
+  canPromote,
+  onPromoting,
+  onPromoted,
+  deleting,
   onDelete,
 }: {
   readonly capture: CaptureDetail;
   readonly health: Health;
-  /** Opens the Promote dialog; null when this capture cannot be promoted here. */
-  readonly onPromote: (() => void) | null;
+  readonly scenarios: Scenarios | undefined;
+  /** False when this capture cannot be promoted here: no Promote, no editing. */
+  readonly canPromote: boolean;
+  /** Promote was pressed. */
+  readonly onPromoting: () => void;
+  readonly onPromoted: (result: PromotionResult) => void;
+  /** The delete confirmation is open, so leaving after it needs no other. */
+  readonly deleting: boolean;
   /** Asks to delete this capture. */
   readonly onDelete: () => void;
 }) {
   const { request, response, provenance } = capture;
   const promotions = usePromotions(health, { review: null, scenario: null });
+  // The pencil turns the page into the promotion's editor: where it goes, the response headers and body.
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const promotion = usePromotion(capture, editing || confirming);
+  const { editable, edits } = promotion;
+  const unsaved = editing && promotion.changed;
+  // Leaving the capture with unpromoted edits asks first; another query on the same page does not.
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) => unsaved && !deleting && currentLocation.pathname !== nextLocation.pathname,
+  );
+  const stopEditing = (): void => {
+    promotion.reset();
+    setEditing(false);
+  };
   return (
     <section aria-labelledby="capture-title">
       <div className="flex flex-wrap items-start gap-3 border-b border-line px-4 pt-1 pb-2">
@@ -211,11 +226,18 @@ function Detail({
           >
             <TrashIcon className="size-3.5" />
           </button>
-          {onPromote === null ? null : (
-            <button type="button" className={primaryButtonClass} onClick={onPromote}>
+          {canPromote ? (
+            <button
+              type="button"
+              className={primaryButtonClass}
+              onClick={() => {
+                onPromoting();
+                setConfirming(true);
+              }}
+            >
               Promote
             </button>
-          )}
+          ) : null}
         </div>
       </div>
       {capture.promotedTo.length === 0 ? null : (
@@ -299,7 +321,44 @@ function Detail({
         )}
       </Part>
 
-      <Part title="Response">
+      {editing ? (
+        <Part title="Promote to">
+          <PromoteFields promotion={promotion} scenarios={scenarios} />
+        </Part>
+      ) : null}
+
+      <Part
+        title="Response"
+        actions={
+          !canPromote ? undefined : editing ? (
+            <button
+              type="button"
+              className={iconButtonClass}
+              aria-label="Discard edits"
+              title="Discard edits"
+              onClick={() => {
+                if (promotion.changed) setDiscarding(true);
+                else stopEditing();
+              }}
+            >
+              <CloseIcon className="size-3.5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={iconButtonClass}
+              aria-label="Edit before promoting"
+              title="Edit before promoting"
+              onClick={() => {
+                promotion.startEditing();
+                setEditing(true);
+              }}
+            >
+              <PencilIcon className="size-3.5" />
+            </button>
+          )
+        }
+      >
         {response.state === 'unreadable' ? (
           <Unreadable file="the response files" />
         ) : (
@@ -313,25 +372,59 @@ function Detail({
                 Modified since capture: the response file no longer matches the digest recorded with it.
               </p>
             ) : null}
+            {editing && editable === null ? (
+              <p className="px-3 py-1.5 text-faint">
+                Only a complete text body can be edited here; it is promoted as captured.
+              </p>
+            ) : null}
             <Facts
               rows={[
                 ['Status', String(response.status)],
                 ['File', response.fileName],
               ]}
             />
-            <Sub title="Headers" count={response.headers.length}>
-              <HeaderList
-                headers={response.headers}
-                label="Captured response headers"
-                empty="No headers were kept beside the response file."
-              />
+            <Sub title="Headers" count={edits === null ? response.headers.length : edits.headers.length}>
+              {edits === null ? (
+                <HeaderList
+                  headers={response.headers}
+                  label="Captured response headers"
+                  empty="No headers were kept beside the response file."
+                />
+              ) : (
+                <div className="px-3 pb-1">
+                  <NameValueTable
+                    caption="Response headers"
+                    rows={edits.headers}
+                    scopes={null}
+                    addLabel="Add header"
+                    clearLabel="Clear all headers"
+                    onChange={(headers) => {
+                      promotion.setEdits({ ...edits, headers });
+                    }}
+                  />
+                </div>
+              )}
             </Sub>
             <Sub title="Body">
-              <BodyView
-                preview={response.body}
-                status={response.status}
-                mediaType={mediaTypeOf(response.headers) ?? mediaTypeOfFile(response.fileName)}
-              />
+              {edits === null ? (
+                <BodyView
+                  preview={response.body}
+                  status={response.status}
+                  mediaType={mediaTypeOf(response.headers) ?? mediaTypeOfFile(response.fileName)}
+                />
+              ) : (
+                <div className="px-3 pb-1">
+                  <CodeEditor
+                    label="Response body"
+                    hideLabel
+                    language={editable?.json === true ? 'json' : 'text'}
+                    value={edits.body}
+                    onChange={(body) => {
+                      promotion.setEdits((current) => (current === null ? current : { ...current, body }));
+                    }}
+                  />
+                </div>
+              )}
             </Sub>
           </>
         )}
@@ -377,12 +470,56 @@ function Detail({
           </>
         )}
       </Part>
+
+      {confirming ? (
+        <PromoteConfirm
+          promotion={promotion}
+          onClose={() => {
+            setConfirming(false);
+          }}
+          onPromoted={(result) => {
+            setConfirming(false);
+            stopEditing();
+            onPromoted(result);
+          }}
+        />
+      ) : null}
+      {discarding || blocker.state === 'blocked' ? (
+        <ConfirmDialog
+          title="Discard edits?"
+          confirm="Discard"
+          onClose={() => {
+            setDiscarding(false);
+            if (blocker.state === 'blocked') blocker.reset();
+          }}
+          onConfirm={async () => {
+            setDiscarding(false);
+            stopEditing();
+            if (blocker.state === 'blocked') blocker.proceed();
+            await Promise.resolve();
+          }}
+        >
+          <p>The changes to where this capture is promoted to and to its response are lost.</p>
+        </ConfirmDialog>
+      ) : null}
     </section>
   );
 }
 
-function Part({ title, children }: { readonly title: string; readonly children: ReactNode }) {
-  return <Collapsible title={title}>{children}</Collapsible>;
+function Part({
+  title,
+  actions,
+  children,
+}: {
+  readonly title: string;
+  readonly actions?: ReactNode;
+  readonly children: ReactNode;
+}) {
+  return (
+    <Collapsible title={title} {...(actions === undefined ? {} : { actions })}>
+      {children}
+    </Collapsible>
+  );
 }
 
 function Sub({

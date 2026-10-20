@@ -402,19 +402,17 @@ describe('review state', () => {
   });
 });
 
-describe('the Promote dialog', () => {
-  it('previews the files, confirms a hand-written file with the digest shown, promotes, and links back', async () => {
+describe('Promote on the capture page', () => {
+  it('asks for confirmation with the files, confirms a hand-written file with the digest shown, and promotes', async () => {
     const { fake, posts } = promotingAtlas();
     const user = renderApp(fake, '#/captures/default/000001');
-    const open = await screen.findByRole('button', { name: 'Promote' });
-    await user.click(open);
-    const dialog = await screen.findByRole('dialog', { name: /Promote capture default\/000001/ });
-    expect(document.activeElement).toBe(within(dialog).getByLabelText('Scenario'));
+    await user.click(await screen.findByRole('button', { name: 'Promote' }));
+    const dialog = await screen.findByRole('dialog', { name: /Promote capture default\/000001\?/ });
 
-    // The dry run: the binding Janus found, its tier, the file with the rewrite marked.
-    await within(dialog).findByText('pay_8f2e91c0');
-    expect(within(dialog).getByText(/inferred, from the response/)).toBeDefined();
-    expect(within(dialog).getAllByText('{{$scenario.ids.paymentId}}').length).toBeGreaterThan(0);
+    // The dry run: the file with the rewrite marked.
+    await waitFor(() => {
+      expect(within(dialog).getAllByText('{{$scenario.ids.paymentId}}').length).toBeGreaterThan(0);
+    });
     const promote = within(dialog).getByRole('button', { name: 'Promote' });
     expect((promote as HTMLButtonElement).disabled).toBe(true);
 
@@ -438,42 +436,100 @@ describe('the Promote dialog', () => {
     expect(await screen.findByText(/It is pending review/)).toBeDefined();
   });
 
-  it('sends only the edits made after the pencil is pressed', async () => {
+  it('edits on the page after the pencil is pressed, and sends only what changed', async () => {
     const { fake, posts } = promotingAtlas();
     const user = renderApp(fake, '#/captures/default/000001');
-    await user.click(await screen.findByRole('button', { name: 'Promote' }));
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Edit before promoting' }));
-    expect(within(dialog).getByRole('group', { name: 'Body' })).toBeDefined();
     const dryRuns = () => posts.filter((post) => post.path === 'promotions' && post.body['dryRun'] === true);
+    await user.click(await screen.findByRole('button', { name: 'Edit before promoting' }));
+
+    // Where it goes, with the binding Janus found and its tier.
+    const target = screen.getByRole('region', { name: 'Promote to' });
+    await within(target).findByText('pay_8f2e91c0');
+    expect(within(target).getByText(/inferred, from the response/)).toBeDefined();
     // Opening the editor changes nothing.
-    await waitFor(() => {
-      expect(dryRuns().length).toBeGreaterThan(0);
-    });
     expect(dryRuns().at(-1)?.body).not.toHaveProperty('headers');
-    await user.click(within(dialog).getByRole('button', { name: 'Add header' }));
-    await user.type(within(dialog).getByRole('textbox', { name: 'Response headers name 1' }), 'x-edited');
-    await user.type(within(dialog).getByRole('textbox', { name: 'Response headers value 1' }), 'yes');
+    expect(dryRuns().at(-1)?.body).not.toHaveProperty('body');
+
+    await user.click(screen.getByRole('button', { name: 'Add header' }));
+    await user.type(screen.getByRole('textbox', { name: 'Response headers name 1' }), 'x-edited');
+    await user.type(screen.getByRole('textbox', { name: 'Response headers value 1' }), 'yes');
     await waitFor(() => {
       expect(dryRuns().at(-1)?.body['headers']).toEqual({ 'x-edited': 'yes' });
     });
     expect(dryRuns().at(-1)?.body).not.toHaveProperty('body');
-    await user.click(within(dialog).getByRole('button', { name: 'Discard edits' }));
+
+    // Promote sends the edits.
+    await user.click(screen.getByRole('button', { name: 'Promote' }));
+    const dialog = await screen.findByRole('dialog', { name: /Promote capture/ });
+    await user.click(await within(dialog).findByRole('checkbox', { name: /Replace \/v1\/payments\/POST\/402.json/ }));
     await waitFor(() => {
-      expect(dryRuns().at(-1)?.body).not.toHaveProperty('headers');
+      expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Promote' }).disabled).toBe(false);
     });
+    await user.click(within(dialog).getByRole('button', { name: 'Promote' }));
+    await screen.findByText(/It is pending review/);
+    const write = posts.filter((post) => post.path === 'promotions' && post.body['dryRun'] !== true).at(-1);
+    expect(write?.body['headers']).toEqual({ 'x-edited': 'yes' });
+    // Promoting ends editing.
+    expect(screen.queryByRole('region', { name: 'Promote to' })).toBeNull();
   });
 
-  it('shows a refused route template next to its field, and closes on Escape', async () => {
+  it('asks before discarding edits, and leaves editing at once when nothing changed', async () => {
     const { fake } = promotingAtlas();
     const user = renderApp(fake, '#/captures/default/000001');
-    await user.click(await screen.findByRole('button', { name: 'Promote' }));
-    const dialog = await screen.findByRole('dialog');
-    const path = within(dialog).getByLabelText(/Route template/);
+    await user.click(await screen.findByRole('button', { name: 'Edit before promoting' }));
+    await user.click(screen.getByRole('button', { name: 'Discard edits' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Promote to' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Edit before promoting' }));
+    await user.type(screen.getByLabelText(/^Variant/), 'declined');
+    await user.click(screen.getByRole('button', { name: 'Discard edits' }));
+    let confirm = await screen.findByRole('dialog', { name: 'Discard edits?' });
+    await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByLabelText<HTMLInputElement>(/^Variant/).value).toBe('declined');
+
+    // Leaving the capture asks too.
+    await user.click(screen.getByRole('link', { name: '← All captures' }));
+    confirm = await screen.findByRole('dialog', { name: 'Discard edits?' });
+    await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('region', { name: 'Promote to' })).toBeDefined();
+
+    await user.click(screen.getByRole('button', { name: 'Discard edits' }));
+    confirm = await screen.findByRole('dialog', { name: 'Discard edits?' });
+    await user.click(within(confirm).getByRole('button', { name: 'Discard' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('region', { name: 'Promote to' })).toBeNull();
+    });
+    await user.click(screen.getByRole('button', { name: 'Edit before promoting' }));
+    expect(screen.getByLabelText<HTMLInputElement>(/^Variant/).value).toBe('');
+  });
+
+  it('copies the body as captured, and as edited once the pencil is pressed', async () => {
+    const { fake } = promotingAtlas();
+    const user = renderApp(fake, '#/captures/default/000001');
+    const response = await screen.findByRole('region', { name: 'Response' });
+    await user.click(within(response).getByRole('button', { name: 'Copy body' }));
+    expect(await navigator.clipboard.readText()).toBe('{"id":"pay_8f2e91c0","status":"declined"}');
+    expect(within(response).getByRole('status').textContent).toBe('Copied');
+
+    await user.click(screen.getByRole('button', { name: 'Edit before promoting' }));
+    await user.click(await within(response).findByRole('button', { name: 'Copy response body' }));
+    expect(await navigator.clipboard.readText()).toBe('{\n  "id": "pay_8f2e91c0",\n  "status": "declined"\n}\n');
+  });
+
+  it('shows a refused route template next to its field, and the confirmation closes on Escape', async () => {
+    const { fake } = promotingAtlas();
+    const user = renderApp(fake, '#/captures/default/000001');
+    await user.click(await screen.findByRole('button', { name: 'Edit before promoting' }));
+    const path = screen.getByLabelText(/Route template/);
     await user.clear(path);
     await user.type(path, '/v1/{{x}/y');
-    const error = await within(dialog).findByText(/has 3 segments/);
+    const error = await screen.findByText(/has 3 segments/);
     expect(path.getAttribute('aria-describedby')).toBe(error.id);
+
+    await user.click(screen.getByRole('button', { name: 'Promote' }));
+    const dialog = await screen.findByRole('dialog', { name: /Promote capture/ });
+    expect(await within(dialog).findByText(/cannot be promoted as set up/)).toBeDefined();
     await user.keyboard('{Escape}');
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();

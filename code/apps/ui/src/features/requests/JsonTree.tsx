@@ -5,6 +5,7 @@ import { iconButtonClass } from '../../components/buttonClass.js';
 import { ChevronRightIcon, LineNumbersIcon } from '../../components/icons.js';
 import { BodyPreview, type Mark } from '../fixtures/Preview.js';
 import { formatBytes } from '../fixtures/format.js';
+import { copyLabel, CopyButton } from './CopyButton.js';
 import { VariableIcon } from './icons.js';
 import { useBodyAsText, useLineNumbers } from './storedFlag.js';
 import { childPath, variableNameFor } from './variables.js';
@@ -92,6 +93,8 @@ export function BodyView({
   return (
     <div className="relative">
       <div className="absolute top-1.5 right-4 z-10 flex items-center gap-1.5">
+        {/* The body exactly as it came, not as the tree or the text view lays it out. */}
+        {json === null ? null : <CopyButton label={copyLabel(name ?? 'Body')} text={() => preview.value} />}
         {numbers}
         {json === null ? null : (
           <div

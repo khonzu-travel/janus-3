@@ -3,13 +3,14 @@ import type { EditorView } from '@codemirror/view';
 import type { EditorLanguage } from './codeMirror.js';
 import { useEffect, useId, useLayoutEffect, useRef } from 'react';
 
+import { copyLabel, CopyButton } from './CopyButton.js';
 import { VariableLine } from './fields.js';
 import type { Scopes } from './variables.js';
 
 /**
  * A labelled code editor, JavaScript for the Before and After scripts or
  * JSON or text for a body: line numbers, bracket matching, undo, Tab and
- * Shift + Tab for indenting. Given `scopes`, the variables the text reads show
+ * Shift + Tab for indenting. JSON folds, and has a button that copies it. Given `scopes`, the variables the text reads show
  * under it, as under any template field.
  * CodeMirror loads with the first one shown.
  */
@@ -72,10 +73,17 @@ export function CodeEditor({
       <span id={labelId} className={hideLabel ? 'sr-only' : 'block text-muted'}>
         {label}
       </span>
-      <div
-        ref={host}
-        className="min-h-40 overflow-hidden rounded border border-line-strong bg-surface focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent"
-      />
+      <div className="relative">
+        <div
+          ref={host}
+          className="min-h-40 overflow-hidden rounded border border-line-strong bg-surface focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent"
+        />
+        {language === 'json' ? (
+          <div className="absolute top-1.5 right-4 z-10">
+            <CopyButton label={copyLabel(label)} text={() => latest.current.value} />
+          </div>
+        ) : null}
+      </div>
       <VariableLine text={value} scopes={scopes} />
     </div>
   );

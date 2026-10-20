@@ -119,3 +119,17 @@ describe('line numbers', () => {
     await user.click(screen.getByRole('button', { name: 'Line numbers' }));
   });
 });
+
+describe('copying a body', () => {
+  it('copies a JSON body exactly as it came, and offers no copy for other text', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <BodyView name="Request body" preview={text('{"a":1,  "b":[2]}')} status={200} mediaType={null} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Copy request body' }));
+    expect(await navigator.clipboard.readText()).toBe('{"a":1,  "b":[2]}');
+    unmount();
+    render(<BodyView preview={text('plain words')} status={200} mediaType="text/plain" />);
+    expect(screen.queryByRole('button', { name: 'Copy body' })).toBeNull();
+  });
+});
