@@ -22,6 +22,27 @@ export type FormatSpec =
   /** The default for `now` without a zone: RFC 3339 in UTC. */
   | { readonly kind: 'utc' };
 
+export type ArithmeticOperator = '+' | '-' | '*' | '/';
+
+/**
+ * Arithmetic on a request value. `date(…)` reads an RFC 3339 date or
+ * date-time and applies clock steps; `num(…)` reads a number and applies
+ * operations with literal operands, `*` and `/` before `+` and `-`.
+ */
+export type RequestTransform =
+  | {
+      readonly kind: 'date';
+      readonly steps: readonly ClockStep[];
+      /** The token's `@zone`, or null for the value's own offset (a date-time) or `dynamic.timezone` (a date). */
+      readonly zone: string | null;
+      /** The token's format, or null for the value's own shape. */
+      readonly format: FormatSpec | null;
+    }
+  | {
+      readonly kind: 'num';
+      readonly operations: readonly { readonly operator: ArithmeticOperator; readonly operand: number }[];
+    };
+
 export type JsonScalar = string | number | boolean | null;
 
 export type GeneratorSpec =
@@ -45,6 +66,8 @@ export type TokenSpec =
       readonly source: 'path' | 'query' | 'header' | 'body' | 'method';
       /** Parameter, query or lower-cased header name, or the JSONPath; "" for `method`. */
       readonly name: string;
+      /** `date(…)` or `num(…)` around the value; absent when it is copied as it is. */
+      readonly transform?: RequestTransform;
     }
   | { readonly category: 'generator'; readonly generator: GeneratorSpec; readonly unique: boolean }
   /** The selected scenario and the caller's sequence position. */

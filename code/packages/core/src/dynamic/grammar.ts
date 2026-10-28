@@ -3,6 +3,7 @@ import { checkJsonPath } from './jsonpath.js';
 import { checkFakerPath, fakerPaths } from './random.js';
 import { isValidTimeZone } from './time.js';
 import type {
+  ArithmeticOperator,
   ClockStep,
   DynamicErrorCode,
   DynamicProblem,
@@ -12,6 +13,7 @@ import type {
   JsonScalar,
   PatternField,
   PatternPart,
+  RequestTransform,
   Segment,
   Template,
   TokenSpec,
@@ -22,6 +24,8 @@ import type {
  * The token grammar:
  *
  *     {{$ base [offset…] [@timezone] [:format] [:unique] }}
+ *     {{$ date(<request value>) [offset…] [@timezone] [:format] }}
+ *     {{$ num(<request value>) [operator number…] }}
  *
  * Whitespace outside quotes is ignored, `{{$$` is a literal `{{$`, and a token
  * ends at the first `}}`. Parsing checks everything that can be known before a
@@ -78,6 +82,8 @@ export const BUILT_IN_NAMES: readonly string[] = Object.freeze([
   'randomInt',
   'randomFrom',
   'method',
+  'date',
+  'num',
   'faker',
   ...REQUEST_PREFIXES,
   'scenario',
@@ -233,6 +239,12 @@ function parseSpec(expression: string, context: GrammarContext): TokenSpec {
     if (rest !== '') rejectSuffix(rest, 'method');
     return { category: 'request', source: 'method', name: '' };
   }
+  if (name === 'date' || name === 'num') {
+    if (!rest.startsWith('('))
+      return invalid(`${name} takes a request value in parentheses, e.g. ${transformExample(name)}`);
+    const close = matchingParen(rest);
+    return parseTransform(name, rest.slice(1, close), rest.slice(close + 1), context);
+  }
   if ((REQUEST_PREFIXES as readonly string[]).includes(name) || name === 'faker') {
     return invalid(`"${name}" needs a name after a dot, e.g. ${name === 'body' ? 'body.$.id' : `${name}.id`}`);
   }
@@ -297,8 +309,74 @@ function exampleOf(name: 'randomInt' | 'randomFrom'): string {
   return name === 'randomInt' ? 'randomInt(1,5)' : 'randomFrom("a","b")';
 }
 
+function transformExample(name: 'date' | 'num'): string {
+  return name === 'date' ? 'date(body.$.startDate)+30d' : 'num(query.page)+1';
+}
+
+/** `date(<request value>)…` and `num(<request value>)…`: a request value with arithmetic after it. */
+function parseTransform(name: 'date' | 'num', inner: string, rest: string, context: GrammarContext): TokenSpec {
+  const prefix = /^(path|query|header|body)\./.exec(inner)?.[1] as (typeof REQUEST_PREFIXES)[number] | undefined;
+  if (prefix === undefined) {
+    return invalid(
+      `${name}(…) reads a request value: path.<name>, query.<name>, header.<name> or body.<JSONPath>, e.g. ${transformExample(name)}`,
+    );
+  }
+  const spec = parseRequest(prefix, inner.slice(prefix.length + 1), context);
+  if (spec.category !== 'request') return invalid(`${name}(…) reads a request value`);
+  let transform: RequestTransform;
+  if (name === 'date') {
+    const { steps, zone, format } = parseClockSuffix(rest);
+    transform = { kind: 'date', steps: Object.freeze(steps), zone, format };
+  } else {
+    transform = { kind: 'num', operations: Object.freeze(parseOperations(rest)) };
+  }
+  return { ...spec, transform: Object.freeze(transform) };
+}
+
+/** `+1`, `*2.5`, `/-4`: operators with literal number operands. */
+function parseOperations(text: string): { operator: ArithmeticOperator; operand: number }[] {
+  const operations: { operator: ArithmeticOperator; operand: number }[] = [];
+  let rest = text;
+  while (rest !== '') {
+    const operator = rest.charAt(0);
+    if (operator !== '+' && operator !== '-' && operator !== '*' && operator !== '/') {
+      if (operator === '@' || operator === ':') {
+        return invalid('time zones and formats apply only to date(…) and clock values, not num(…)');
+      }
+      return invalid(`unexpected "${rest}"; num(…) takes +, -, * or / followed by a number`);
+    }
+    const literal = NUMBER_LITERAL.exec(rest.slice(1))?.[0];
+    if (literal === undefined) return invalid(`"${operator}" must be followed by a number, e.g. num(query.page)+1`);
+    const operand = Number(literal);
+    if (!Number.isFinite(operand)) return invalid(`${literal} is too large`);
+    if (operator === '/' && operand === 0) return invalid('num(…) cannot divide by zero');
+    operations.push({ operator, operand });
+    rest = rest.slice(1 + literal.length);
+  }
+  return operations;
+}
+
 /** Offsets, `@zone`, `:format` — in that order — after a clock base or alias. */
 function parseClock(expansion: ClockExpansion, text: string): TokenSpec {
+  const { steps, zone, format } = parseClockSuffix(text);
+  const start = expansion.start;
+  return {
+    category: 'clock',
+    start,
+    steps: Object.freeze([...expansion.steps, ...steps]),
+    zone,
+    format:
+      format ??
+      expansion.format ??
+      (start === 'today' ? { kind: 'date' } : zone === null ? { kind: 'utc' } : { kind: 'datetime' }),
+  };
+}
+
+function parseClockSuffix(text: string): {
+  readonly steps: ClockStep[];
+  readonly zone: string | null;
+  readonly format: FormatSpec | null;
+} {
   const { steps, rest: afterOffsets } = parseOffsets(text);
   let rest = afterOffsets;
   let zone: string | null = null;
@@ -324,17 +402,7 @@ function parseClock(expansion: ClockExpansion, text: string): TokenSpec {
   if (rest.startsWith('@')) return invalid('the time zone must come before the format');
   if (rest.startsWith('+') || rest.startsWith('-')) return invalid('offsets must come before the time zone and format');
   if (rest !== '') return invalid(`unexpected "${rest}"`);
-  const start = expansion.start;
-  return {
-    category: 'clock',
-    start,
-    steps: Object.freeze([...expansion.steps, ...steps]),
-    zone,
-    format:
-      format ??
-      expansion.format ??
-      (start === 'today' ? { kind: 'date' } : zone === null ? { kind: 'utc' } : { kind: 'datetime' }),
-  };
+  return { steps, zone, format };
 }
 
 /** `+1mo-1d`, `+2h15min`: signed groups of one or more amount-unit pairs. */
@@ -508,6 +576,22 @@ function closingParen(text: string): number {
   return invalid('missing ")"');
 }
 
+/** The index of the ")" matching the "(" at 0, counting nested parentheses and skipping quoted text. */
+function matchingParen(text: string): number {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charAt(i);
+    if (quote !== null) {
+      if (char === '\\') i++;
+      else if (char === quote) quote = null;
+    } else if (char === '"' || char === "'") quote = char;
+    else if (char === '(') depth++;
+    else if (char === ')' && --depth === 0) return i;
+  }
+  return invalid('missing ")"');
+}
+
 function parseRandomInt(args: string): GeneratorSpec {
   const parts = args.split(',');
   if (parts.length !== 2) return invalid('randomInt takes two integers: randomInt(min,max)');
@@ -520,6 +604,8 @@ function parseRandomInt(args: string): GeneratorSpec {
   if (min > max) return invalid(`randomInt(${String(min)},${String(max)}) needs min <= max`);
   return { kind: 'randomInt', min, max };
 }
+
+const NUMBER_LITERAL = /^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/;
 
 const JSON_LITERAL = /^(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)$/;
 

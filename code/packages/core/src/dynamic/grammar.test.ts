@@ -233,3 +233,63 @@ describe('load-time errors', () => {
     expect(spec('path.anything', context(null))).toMatchObject({ name: 'anything' });
   });
 });
+
+describe('date(…) and num(…)', () => {
+  it('parse a request value with clock steps, a zone and a format', () => {
+    expect(spec('date(body.$.startDate)+30d')).toEqual({
+      category: 'request',
+      source: 'body',
+      name: '$.startDate',
+      transform: { kind: 'date', steps: [{ kind: 'add', amount: 30, unit: 'd' }], zone: null, format: null },
+    });
+    expect(spec('date(query.from)+1mo@Asia/Tokyo:"dd/MM/yyyy"')).toMatchObject({
+      source: 'query',
+      name: 'from',
+      transform: { kind: 'date', zone: 'Asia/Tokyo', format: { kind: 'pattern' } },
+    });
+    expect(spec('date(header.X-Start):unix')).toMatchObject({
+      name: 'x-start',
+      transform: { format: { kind: 'unix' } },
+    });
+  });
+
+  it('keep parentheses and quotes inside a JSONPath', () => {
+    expect(spec('date(body.$.items[?(@.kind=="a)")].at)-1d')).toMatchObject({
+      name: '$.items[?(@.kind=="a)")].at',
+    });
+  });
+
+  it('parse num(…) operations with literal operands', () => {
+    expect(spec('num(body.$.qty) * 2.5 + -1')).toEqual({
+      category: 'request',
+      source: 'body',
+      name: '$.qty',
+      transform: {
+        kind: 'num',
+        operations: [
+          { operator: '*', operand: 2.5 },
+          { operator: '+', operand: -1 },
+        ],
+      },
+    });
+    expect(spec('num(path.page)')).toMatchObject({ transform: { kind: 'num', operations: [] } });
+  });
+
+  it('reject mistakes at load', () => {
+    expect(failure('date').message).toMatch(/takes a request value in parentheses/);
+    expect(failure('date(now)+1d').message).toMatch(/reads a request value/);
+    expect(failure('date(query.from').message).toMatch(/missing "\)"/);
+    expect(failure('date(query.from):unique').message).toMatch(/:unique/);
+    expect(failure('num(query.n)/0').message).toMatch(/divide by zero/);
+    expect(failure('num(query.n)+x').message).toMatch(/must be followed by a number/);
+    expect(failure('num(query.n):date').message).toMatch(/formats apply only to date/);
+    expect(failure('num(query.n)+1d').message).toMatch(/unexpected "d"/);
+    expect(failure('date(path.nope)', context(['id'])).code).toBe('unknown-path-parameter');
+  });
+
+  it('cannot be alias names', () => {
+    expect(expandAliases({ date: 'today+1d' }).problems).toEqual([
+      { name: 'date', message: 'alias "date" shadows the built-in value of the same name' },
+    ]);
+  });
+});

@@ -14,8 +14,16 @@ import type { DynamicFixture } from './fixture.js';
 import { serializeJsonTree, type JsonWriter } from './json-tree.js';
 import { firstMatch } from './jsonpath.js';
 import { generate, TokenRandom } from './random.js';
-import { evaluateClock, formatClock } from './time.js';
-import type { Segment, Template } from './types.js';
+import {
+  evaluateClock,
+  evaluateSteps,
+  formatClock,
+  parseRfc3339Date,
+  parseRfc3339WithOffset,
+  type EvaluatedClock,
+  type Zone,
+} from './time.js';
+import type { RequestTransform, Segment, Template } from './types.js';
 
 /**
  * Renders a dynamic fixture for one request. Pure: the
@@ -206,13 +214,18 @@ class RenderContext {
       }
       case 'request':
       case 'context': {
-        const value =
+        let value =
           spec.category === 'request'
             ? this.requestValue(spec.source, spec.name)
             : this.contextValue(spec.source, spec.name);
+        let reason = 'the request has no value for it';
+        if (value !== MISSING && spec.category === 'request' && spec.transform !== undefined) {
+          value = this.transform(spec.transform, value, token.expression);
+          reason = `the request value is not ${spec.transform.kind === 'date' ? 'an RFC 3339 date or date-time' : 'a number'}`;
+        }
         if (value !== MISSING) return value;
         if (this.env.strictRefs && !this.env.preview) {
-          throw new RenderFailure(token.expression, 'the request has no value for it and dynamic.strictRefs is true');
+          throw new RenderFailure(token.expression, `${reason} and dynamic.strictRefs is true`);
         }
         if (!this.unresolved.includes(token.expression)) this.unresolved.push(token.expression);
         return MISSING;
@@ -237,6 +250,33 @@ class RenderContext {
         }
       }
     }
+  }
+
+  /** `date(…)` and `num(…)`: missing when the value is not a date or a number. */
+  private transform(transform: RequestTransform, value: Value, expression: string): Value {
+    if (transform.kind === 'num') {
+      const number =
+        typeof value === 'number' ? value : typeof value === 'string' && DECIMAL.test(value) ? Number(value) : NaN;
+      if (!Number.isFinite(number)) return MISSING;
+      const result = calculate(number, transform.operations);
+      if (!Number.isFinite(result)) throw new RenderFailure(expression, 'the result is not a finite number');
+      return result;
+    }
+    if (typeof value !== 'string') return MISSING;
+    const date = parseRfc3339Date(value);
+    const dateTime = date === null ? parseRfc3339WithOffset(value) : null;
+    if (date === null && dateTime === null) return MISSING;
+    const zone: Zone = transform.zone ?? (dateTime === null ? this.env.timezone : dateTime.offset);
+    let evaluated: EvaluatedClock;
+    try {
+      evaluated =
+        dateTime === null
+          ? evaluateSteps({ mode: 'local', ms: date ?? 0 }, transform.steps, zone)
+          : evaluateSteps({ mode: 'instant', ms: dateTime.instant }, transform.steps, zone);
+    } catch (error) {
+      throw new RenderFailure(expression, error instanceof RangeError ? error.message : 'the date cannot be computed');
+    }
+    return formatClock(evaluated, transform.format ?? { kind: dateTime === null ? 'date' : 'datetime' }, zone);
   }
 
   private contextValue(source: 'scenario-name' | 'scenario-id' | 'sequence-position', name: string): Value {
@@ -362,6 +402,27 @@ function canonicalJson(bytes: Uint8Array): string | null {
     return null;
   }
   return canonicalJsonText(value);
+}
+
+const DECIMAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+/**
+ * `num(…)` arithmetic: `*` and `/` before `+` and `-`, each left to right.
+ * A fractional result is rounded to 15 significant digits, so `0.1+0.2` is `0.3`.
+ */
+function calculate(value: number, operations: Extract<RequestTransform, { kind: 'num' }>['operations']): number {
+  let sum = 0;
+  let term = value;
+  for (const { operator, operand } of operations) {
+    if (operator === '*') term *= operand;
+    else if (operator === '/') term /= operand;
+    else {
+      sum += term;
+      term = operator === '+' ? operand : -operand;
+    }
+  }
+  const result = sum + term;
+  return Number.isInteger(result) || !Number.isFinite(result) ? result : Number(result.toPrecision(15));
 }
 
 /** A whole-value token's JSON text. */

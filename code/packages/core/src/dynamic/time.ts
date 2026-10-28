@@ -44,6 +44,9 @@ function formatter(zone: string): Intl.DateTimeFormat | null {
   return cached;
 }
 
+/** An IANA zone name, or a fixed offset from UTC in milliseconds (the offset an RFC 3339 value carries). */
+export type Zone = string | number;
+
 /** True for a zone `Intl` knows (IANA names, `UTC`). Offsets such as `+02:00` are not zones. */
 export function isValidTimeZone(zone: string): boolean {
   return /^[A-Za-z][A-Za-z0-9_+\-/]*$/.test(zone) && formatter(zone) !== null;
@@ -57,7 +60,8 @@ export function isUtcZone(zone: string): boolean {
 }
 
 /** The zone's offset from UTC at `instant`, in milliseconds (local = instant + offset). */
-export function zoneOffset(zone: string, instant: number): number {
+export function zoneOffset(zone: Zone, instant: number): number {
+  if (typeof zone === 'number') return zone;
   if (isUtcZone(zone)) return 0;
   const format = formatter(zone);
   if (format === null) throw new RangeError(`unknown time zone ${zone}`);
@@ -74,7 +78,7 @@ export function zoneOffset(zone: string, instant: number): number {
 }
 
 /** Local wall time (as if it were UTC) → the instant it names in `zone`. Gap times move forward. */
-export function localToInstant(zone: string, local: number): number {
+export function localToInstant(zone: Zone, local: number): number {
   const guess = local - zoneOffset(zone, local);
   return local - zoneOffset(zone, guess);
 }
@@ -91,7 +95,7 @@ function mod(value: number, by: number): number {
 }
 
 /** A clock value mid-evaluation: an exact instant (`now`) or a local wall time (`today`). */
-interface ClockValue {
+export interface ClockValue {
   readonly mode: 'instant' | 'local';
   readonly ms: number;
 }
@@ -114,9 +118,20 @@ export function evaluateClock(
   zone: string,
   instant: number,
 ): EvaluatedClock {
+  return evaluateSteps(
+    start === 'now'
+      ? { mode: 'instant', ms: instant }
+      : { mode: 'local', ms: floorDay(instant + zoneOffset(zone, instant)) },
+    steps,
+    zone,
+  );
+}
+
+/** Applies steps to an instant or a local wall time, as `evaluateClock` does for `now` and `today`. */
+export function evaluateSteps(start: ClockValue, steps: readonly ClockStep[], zone: Zone): EvaluatedClock {
   const toLocal = (ms: number): number => ms + zoneOffset(zone, ms);
-  let value: ClockValue =
-    start === 'now' ? { mode: 'instant', ms: instant } : { mode: 'local', ms: floorDay(toLocal(instant)) };
+  let value = start;
+  checkRange(value.ms);
   const inLocal = (change: (local: number) => number): void => {
     if (value.mode === 'local') value = { mode: 'local', ms: change(value.ms) };
     else value = { mode: 'instant', ms: localToInstant(zone, change(toLocal(value.ms))) };
@@ -184,7 +199,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** A formatted clock value: a string, or a number for `:unix` and `:unixMillis`. */
-export function formatClock(value: EvaluatedClock, format: FormatSpec, zone: string): string | number {
+export function formatClock(value: EvaluatedClock, format: FormatSpec, zone: Zone): string | number {
   const local = new Date(value.local);
   switch (format.kind) {
     case 'unix':
@@ -200,7 +215,8 @@ export function formatClock(value: EvaluatedClock, format: FormatSpec, zone: str
     case 'datetime': {
       const date = `${year4(local)}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}`;
       const time = `${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}`;
-      return `${date}T${time}${isUtcZone(zone) ? 'Z' : offsetText(value.offset)}`;
+      const utc = typeof zone === 'number' ? zone === 0 : isUtcZone(zone);
+      return `${date}T${time}${utc ? 'Z' : offsetText(value.offset)}`;
     }
     case 'http': {
       const utc = new Date(value.instant);
@@ -262,6 +278,11 @@ const RFC3339 = /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9
  * Returns null for anything else, including impossible dates and leap seconds.
  */
 export function parseRfc3339(text: string): number | null {
+  return parseRfc3339WithOffset(text)?.instant ?? null;
+}
+
+/** `parseRfc3339`, also returning the offset the text was written in, in milliseconds. */
+export function parseRfc3339WithOffset(text: string): { readonly instant: number; readonly offset: number } | null {
   const match = RFC3339.exec(text);
   if (match === null) return null;
   const [, y, mo, d, h, mi, s, fraction, zulu, sign, oh, om] = match;
@@ -271,7 +292,8 @@ export function parseRfc3339(text: string): number | null {
   const hour = Number(h);
   const minute = Number(mi);
   const second = Number(s);
-  if (month > 11 || day < 1 || day > daysInMonth(year, month) || hour > 23 || minute > 59 || second > 59) return null;
+  if (month < 0 || month > 11 || day < 1 || day > daysInMonth(year, month) || hour > 23 || minute > 59 || second > 59)
+    return null;
   let offset = 0;
   if (zulu === undefined) {
     const offsetHours = Number(oh);
@@ -280,7 +302,24 @@ export function parseRfc3339(text: string): number | null {
     offset = (sign === '-' ? -1 : 1) * (offsetHours * 60 + offsetMinutes) * 60_000;
   }
   const ms = Number((fraction ?? '').padEnd(3, '0').slice(0, 3));
-  return civil(year, month, day) + hour * 3_600_000 + minute * 60_000 + second * 1000 + ms - offset;
+  return {
+    instant: civil(year, month, day) + hour * 3_600_000 + minute * 60_000 + second * 1000 + ms - offset,
+    offset,
+  };
+}
+
+const FULL_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** An RFC 3339 full-date ("2026-11-01") as a local wall time at midnight, or null for anything else. */
+export function parseRfc3339Date(text: string): number | null {
+  const match = FULL_DATE.exec(text);
+  if (match === null) return null;
+  const [, y, mo, d] = match;
+  const year = Number(y);
+  const month = Number(mo) - 1;
+  const day = Number(d);
+  if (month < 0 || month > 11 || day < 1 || day > daysInMonth(year, month)) return null;
+  return civil(year, month, day);
 }
 
 function offsetText(offset: number): string {

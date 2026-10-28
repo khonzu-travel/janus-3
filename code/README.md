@@ -505,8 +505,9 @@ curl -H 'X-Mock-Now: 2026-01-01T00:00:00Z' http://127.0.0.1:4010/v1/products/p-4
 
 The syntax is `{{$ base [offset…] [@timezone] [:format] [:unique] }}`.
 Whitespace inside the braces is ignored, a token ends at the first `}}`, and
-`{{$$` writes a literal `{{$`. Tokens never read another field, do arithmetic
-on data, or branch.
+`{{$$` writes a literal `{{$`. Tokens never read another fixture field or
+branch; the only arithmetic is [`date(…)` and `num(…)`](#date-and-number-arithmetic)
+on one request value.
 
 **Where**: JSON bodies (`application/json`, `+json`) inside string values;
 text bodies (`text/*`, `application/yaml`, `application/xml`, `+xml`,
@@ -536,6 +537,8 @@ source key order; a JSON body without tokens is replayed byte for byte.
 | `header.<name>`                         | the first value of a request header, case-insensitive                           |
 | `body.<JSONPath>`                       | the first match in a JSON request body, e.g. `body.$.customer.name`             |
 | `method`                                | the request method                                                              |
+| `date(<request value>)`                 | a request date or date-time with offsets, a zone and a format (see below)       |
+| `num(<request value>)`                  | a request number with `+ - * /` and literal numbers (see below)                 |
 | `uuid`, `ulid`                          | a v4-shaped UUID; a ULID whose time part is the render instant                  |
 | `randomInt(min,max)`                    | an integer in `[min, max]` (base-10 safe integers)                              |
 | `randomFrom(a,b,…)`                     | one of the JSON scalar literals: `randomFrom("a", 2, true, null)`               |
@@ -552,6 +555,37 @@ move the calendar date. **Timezones**: `@Asia/Tokyo` overrides
 `:"dd/MM/yyyy"` using `yyyy yy MM M dd d HH H mm ss SSS EEE MMM XXX`, with
 `'literal'` text. Offsets, zones and formats apply only to clock values.
 Custom aliases come from `dynamic.aliases`.
+
+#### Date and number arithmetic
+
+`date(…)` and `num(…)` wrap one request value (`path.`, `query.`, `header.`
+or `body.`) so a response can derive a value from it:
+
+```json
+{
+  "expirationDate": "{{$date(body.$.startDate)+30d}}",
+  "renewsAt": "{{$date(body.$.startsAt)+1mo:unix}}",
+  "total": "{{$num(body.$.price)*2+4.99}}",
+  "nextPage": "{{$num(query.page)+1}}"
+}
+```
+
+`date(…)` reads an RFC 3339 full-date (`2026-11-01`) or date-time with an
+offset (`2026-11-01T09:00:00+02:00`) and takes the same offsets, `@timezone`
+and `:format` as clock values. A date moves on the calendar like `today` and
+renders as a date; a date-time moves like `now` and renders as a date-time in
+its own offset, or in the `@timezone` when one is given (whole seconds).
+`date(body.$.startDate)+30d` turns `2026-11-01` into `2026-12-01`.
+
+`num(…)` reads a JSON number or a decimal string (query, header and path
+values are strings) and applies `+`, `-`, `*` and `/` with literal numbers,
+`*` and `/` before `+` and `-`; there are no parentheses and no second
+request value. A fractional result is rounded to 15 significant digits, so
+`0.1` plus `0.2` is `0.3`. A lone token renders a JSON number.
+
+A value that is not a date or a number is treated as missing (below). A result
+out of range, or not finite, is `500 render-failed`, and dividing by a literal
+`0` fails at load.
 
 **Missing request values** render as `null` (whole value) or `""` (embedded);
 with `dynamic.strictRefs: true` they are `500 render-failed`. A JSON-typed

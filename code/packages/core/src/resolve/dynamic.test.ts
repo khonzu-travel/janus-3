@@ -597,3 +597,77 @@ describe('custom aliases', () => {
     expect(text(await west.resolve(get('/z')))).toBe('2025-12-31');
   });
 });
+
+describe('date(…) and num(…)', () => {
+  const post = (target: string, body: unknown, headers: HeaderMap = {}): RequestDescription => ({
+    method: 'POST',
+    target,
+    headers: { 'content-type': ['application/json'], 'x-mock-now': [NOW], ...headers },
+    body: utf8Encode(JSON.stringify(body)),
+  });
+  const tree = {
+    'default/subs/POST/201.json': JSON.stringify({
+      startDate: '{{$body.$.startDate}}',
+      expirationDate: '{{$date(body.$.startDate)+30d}}',
+      endOfMonth: '{{$date(body.$.startDate)+1mo:"dd/MM/yyyy"}}',
+      startsAt: '{{$date(body.$.startsAt)+2h}}',
+      startsAtTokyo: '{{$date(body.$.startsAt)@Asia/Tokyo}}',
+      total: '{{$num(body.$.price)*2+1}}',
+      label: 'x{{$num(body.$.qty)+0.2}}',
+    }),
+    'default/subs/POST/201.headers.json': JSON.stringify({ 'X-Next-Page': '{{$num(header.X-Page)+1}}' }),
+  };
+  const engine = engineFor(tree);
+
+  it('add to a date, a date-time in its own offset or a zone, and a number', async () => {
+    const response = await engine.resolve(
+      post(
+        '/subs',
+        { startDate: '2026-01-31', startsAt: '2026-01-31T23:30:00+01:00', price: 9.99, qty: '0.1' },
+        { 'x-page': ['4'] },
+      ),
+    );
+    expect(response.status).toBe(201);
+    expect(json(response)).toEqual({
+      startDate: '2026-01-31',
+      expirationDate: '2026-03-02',
+      endOfMonth: '28/02/2026',
+      startsAt: '2026-02-01T01:30:00+01:00',
+      startsAtTokyo: '2026-02-01T07:30:00+09:00',
+      total: 20.98,
+      label: 'x0.3',
+    });
+    expect(response.headers['x-next-page']).toEqual(['5']);
+  });
+
+  it('treat a value that is not a date or a number as missing, or render-failed under strictRefs', async () => {
+    const body = { startDate: 'soon', startsAt: '2026-01-31T23:30:00', price: 'cheap', qty: true };
+    expect(json(await engine.resolve(post('/subs', body)))).toEqual({
+      startDate: 'soon',
+      expirationDate: null,
+      endOfMonth: null,
+      startsAt: null,
+      startsAtTokyo: null,
+      total: null,
+      label: 'x',
+    });
+    const strict = engineFor(tree, { config: { strictRefs: true } });
+    const response = await strict.resolve(post('/subs', body, { 'x-page': ['1'] }));
+    expect(response.status).toBe(500);
+    expect(response.trace.outcome).toMatchObject({
+      kind: 'render-failed',
+      token: 'date(body.$.startDate)+30d',
+      reason: 'the request value is not an RFC 3339 date or date-time and dynamic.strictRefs is true',
+    });
+  });
+
+  it('fails with render-failed for a result that is not finite', async () => {
+    const big = engineFor({ 'default/n/POST/200.json': '{"n":"{{$num(body.$.n)*10}}"}' });
+    const response = await big.resolve(post('/n', { n: 1e308 }));
+    expect(response.status).toBe(500);
+    expect(response.trace.outcome).toMatchObject({
+      kind: 'render-failed',
+      reason: 'the result is not a finite number',
+    });
+  });
+});
