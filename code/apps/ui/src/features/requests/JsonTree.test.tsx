@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Preview } from '../../atlas/wire.js';
+import { useSelectAllInBoxes } from '../../components/selectAll.js';
 import { BodyView } from './JsonTree.js';
 
 const text = (value: string, truncated = false): Preview => ({
@@ -131,5 +132,59 @@ describe('copying a body', () => {
     unmount();
     render(<BodyView preview={text('plain words')} status={200} mediaType="text/plain" />);
     expect(screen.queryByRole('button', { name: 'Copy body' })).toBeNull();
+  });
+});
+
+describe('select all in a body', () => {
+  function WithSelectAll({ children }: { readonly children: React.ReactNode }) {
+    useSelectAllInBoxes();
+    return (
+      <>
+        <p>Outside the body</p>
+        {children}
+      </>
+    );
+  }
+
+  it('selects only the body from its copy button or from a caret in its text', async () => {
+    const user = userEvent.setup();
+    render(
+      <WithSelectAll>
+        <BodyView name="Request body" preview={text('{"a":1}')} status={200} mediaType={null} />
+      </WithSelectAll>,
+    );
+    screen.getByRole('button', { name: 'Copy request body' }).focus();
+    await user.keyboard('{Control>}a{/Control}');
+    const selected = window.getSelection()?.toString() ?? '';
+    expect(selected).toContain('"a"');
+    expect(selected).not.toContain('Outside the body');
+    expect(selected).not.toContain('Tree');
+
+    // Nothing focused; the caret sits in the text after a click.
+    (document.activeElement as HTMLElement).blur();
+    window.getSelection()?.collapse(screen.getByText('JSON', { exact: false }).firstChild, 0);
+    await user.keyboard('{Control>}a{/Control}');
+    expect(window.getSelection()?.toString()).not.toContain('Outside the body');
+    expect(window.getSelection()?.toString()).toContain('"a"');
+  });
+
+  it('leaves Ctrl + A to the page outside a body', async () => {
+    const user = userEvent.setup();
+    render(
+      <WithSelectAll>
+        <BodyView name="Request body" preview={text('{"a":1}')} status={200} mediaType={null} />
+      </WithSelectAll>,
+    );
+    window.getSelection()?.collapse(screen.getByText('Outside the body').firstChild, 0);
+    const event = new KeyboardEvent('keydown', {
+      key: 'a',
+      code: 'KeyA',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.body.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    await user.keyboard('{Escape}');
   });
 });

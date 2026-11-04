@@ -11,6 +11,7 @@ import {
   indentUnit,
   syntaxHighlighting,
 } from '@codemirror/language';
+import { search } from '@codemirror/search';
 import { EditorState } from '@codemirror/state';
 import {
   drawSelection,
@@ -23,10 +24,13 @@ import {
 } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 
+import { createSearchBar, searchBarKeymap } from './SearchBar.js';
+
 /**
  * The script editor's CodeMirror setup, loaded only when a script editor
  * opens. Tab types an indent, or indents every selected line; Shift + Tab
  * outdents. Escape then Tab moves focus on, as in any CodeMirror editor.
+ * Ctrl/⌘ + F finds and Ctrl + H replaces, in the editor's own find bar.
  */
 
 const INDENT = '  ';
@@ -65,6 +69,11 @@ const theme = EditorView.theme({
   '&.cm-focused .cm-matchingBracket': { backgroundColor: 'var(--accent-soft)', outline: '1px solid var(--accent)' },
   '.cm-foldGutter .cm-gutterElement': { padding: '0 4px', cursor: 'pointer' },
   '.cm-foldGutter .cm-gutterElement:hover': { color: 'var(--fg)' },
+  // Under the copy button, which stays at the editor's top right.
+  '.cm-panels': { backgroundColor: 'var(--bg)', color: 'var(--fg)', zIndex: '1' },
+  '.cm-panels-top': { borderBottom: '1px solid var(--line)' },
+  '.cm-searchMatch': { backgroundColor: 'var(--warn-soft)', borderRadius: '2px' },
+  '.cm-searchMatch-selected': { outline: '1px solid var(--warn)' },
   '.cm-foldPlaceholder': {
     backgroundColor: 'var(--hover)',
     border: '1px solid var(--line)',
@@ -111,7 +120,9 @@ export function createScriptEditor(parent: HTMLElement, options: ScriptEditorOpt
         EditorState.tabSize.of(2),
         ...LANGUAGES[options.language ?? 'javascript'](),
         syntaxHighlighting(highlight),
+        search({ top: true, createPanel: createSearchBar }),
         keymap.of([
+          ...searchBarKeymap,
           { key: 'Tab', run: tab, shift: indentLess },
           ...closeBracketsKeymap,
           ...foldKeymap,

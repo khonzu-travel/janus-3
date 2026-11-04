@@ -12,6 +12,14 @@ export function atlasAddress(url: string): string {
   return parsed.toString();
 }
 
+/**
+ * The one permission a page is granted: writing text to the clipboard, which
+ * the copy buttons need. Reading the clipboard, and everything else, is refused.
+ */
+export function permissionAllowed(permission: string): boolean {
+  return permission === 'clipboard-sanitized-write';
+}
+
 /** What happens to a URL leaving a window: shown in the system browser, or dropped. */
 export type ExternalDecision = 'external' | 'drop';
 

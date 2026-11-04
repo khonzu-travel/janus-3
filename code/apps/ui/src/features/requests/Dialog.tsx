@@ -40,7 +40,8 @@ export function Dialog({
     const element = dialog.current;
     if (element === null) return;
     const onKeyDown = (event: globalThis.KeyboardEvent): void => {
-      if (event.key === 'Escape') {
+      // An Escape something inside already used (closing an editor's find bar) leaves the dialog open.
+      if (event.key === 'Escape' && !event.defaultPrevented) {
         event.stopPropagation();
         close.current();
         return;

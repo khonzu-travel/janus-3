@@ -12,7 +12,14 @@ import { menuTemplate, windowTitle, type MenuActions, type MenuState } from './m
 import { openableFile } from './open-file.js';
 import { problemView } from './problems.js';
 import { startArgs } from './server-args.js';
-import { appNavigation, atlasAddress, atlasNavigation, externalDecision, isAppPage } from './urls.js';
+import {
+  appNavigation,
+  atlasAddress,
+  atlasNavigation,
+  externalDecision,
+  isAppPage,
+  permissionAllowed,
+} from './urls.js';
 import { withWatchDefault } from '../server-host/args.js';
 
 describe('the server start arguments', () => {
@@ -262,5 +269,14 @@ describe('menus and the window title', () => {
 
   it('titles windows with the project and its state', () => {
     expect(windowTitle('shop-mocks', 'http://127.0.0.1:4010')).toBe('Janus — shop-mocks — http://127.0.0.1:4010');
+  });
+});
+
+describe('page permissions', () => {
+  it('grants writing to the clipboard and nothing else', () => {
+    expect(permissionAllowed('clipboard-sanitized-write')).toBe(true);
+    for (const permission of ['clipboard-read', 'media', 'geolocation', 'notifications', 'openExternal']) {
+      expect(permissionAllowed(permission)).toBe(false);
+    }
   });
 });

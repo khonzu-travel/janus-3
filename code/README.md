@@ -1917,7 +1917,8 @@ The Atlas window runs the UI exactly as a browser tab does: same origin as its
 server, no access to the app or the computer, and no navigation outside its
 server's `/_janus/ui/` (other `http:` and `https:` links open in the system
 browser). Every window is sandboxed with context isolation, every permission
-request is denied, and the packaged app turns off running as Node and
+request is denied except writing text to the clipboard (the copy buttons need
+it; reading the clipboard stays denied), and the packaged app turns off running as Node and
 `NODE_OPTIONS` with Electron fuses. The app opens no port of its own; the only
 listener is the project's server, which binds loopback unless the project says
 otherwise.

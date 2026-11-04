@@ -109,6 +109,7 @@ export const PACKAGE_RULES: Readonly<Record<string, PackageRule>> = {
       '@codemirror/lang-javascript',
       '@codemirror/lang-json',
       '@codemirror/language',
+      '@codemirror/search',
       '@codemirror/state',
       '@codemirror/view',
       '@lezer/highlight',

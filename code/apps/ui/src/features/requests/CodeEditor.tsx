@@ -3,6 +3,7 @@ import type { EditorView } from '@codemirror/view';
 import type { EditorLanguage } from './codeMirror.js';
 import { useEffect, useId, useLayoutEffect, useRef } from 'react';
 
+import { isSelectAll } from '../../components/selectAll.js';
 import { copyLabel, CopyButton } from './CopyButton.js';
 import { VariableLine } from './fields.js';
 import type { Scopes } from './variables.js';
@@ -34,6 +35,7 @@ export function CodeEditor({
 }) {
   const labelId = useId();
   const host = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const setValue = useRef<((view: EditorView, value: string) => void) | null>(null);
   const latest = useRef({ value, onChange });
@@ -63,6 +65,23 @@ export function CodeEditor({
     };
   }, [labelId, describedBy, language]);
 
+  // In the text the editor selects all itself; from its copy button, Ctrl/⌘ + A selects the text, not the page.
+  useEffect(() => {
+    const element = box.current;
+    if (element === null) return undefined;
+    const onKey = (event: KeyboardEvent): void => {
+      const editor = view.current;
+      if (editor === null || event.defaultPrevented || !isSelectAll(event)) return;
+      event.preventDefault();
+      editor.dispatch({ selection: { anchor: 0, head: editor.state.doc.length } });
+      editor.focus();
+    };
+    element.addEventListener('keydown', onKey);
+    return () => {
+      element.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
   // A change from outside (a reload, a revert); typing already matches, so it is a no-op then.
   useEffect(() => {
     if (view.current !== null && setValue.current !== null) setValue.current(view.current, value);
@@ -73,10 +92,10 @@ export function CodeEditor({
       <span id={labelId} className={hideLabel ? 'sr-only' : 'block text-muted'}>
         {label}
       </span>
-      <div className="relative">
+      <div ref={box} className="relative">
         <div
           ref={host}
-          className="min-h-40 overflow-hidden rounded border border-line-strong bg-surface focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent"
+          className={`${language === 'json' ? '[&_.cm-panels]:pr-11 ' : ''}min-h-40 overflow-hidden rounded border border-line-strong bg-surface focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent`}
         />
         {language === 'json' ? (
           <div className="absolute top-1.5 right-4 z-10">

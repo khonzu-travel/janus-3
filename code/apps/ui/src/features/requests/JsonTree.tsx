@@ -91,7 +91,7 @@ export function BodyView({
     </button>
   );
   return (
-    <div className="relative">
+    <div className="relative" data-select-all-box="">
       <div className="absolute top-1.5 right-4 z-10 flex items-center gap-1.5">
         {/* The body exactly as it came, not as the tree or the text view lays it out. */}
         {json === null ? null : <CopyButton label={copyLabel(name ?? 'Body')} text={() => preview.value} />}
@@ -119,21 +119,23 @@ export function BodyView({
           </div>
         )}
       </div>
-      {json === null || view === 'text' ? (
-        text
-      ) : (
-        <figure>
-          <figcaption className="px-4 pt-2 pr-28 text-label text-faint">
-            JSON · {formatBytes(preview.byteLength)}
-          </figcaption>
-          <JsonTree
-            value={json}
-            lineNumbers={lineNumbers}
-            {...(name === undefined ? {} : { name })}
-            {...(onSave === undefined ? {} : { onSave })}
-          />
-        </figure>
-      )}
+      <div data-select-all-content="">
+        {json === null || view === 'text' ? (
+          text
+        ) : (
+          <figure>
+            <figcaption className="px-4 pt-2 pr-28 text-label text-faint">
+              JSON · {formatBytes(preview.byteLength)}
+            </figcaption>
+            <JsonTree
+              value={json}
+              lineNumbers={lineNumbers}
+              {...(name === undefined ? {} : { name })}
+              {...(onSave === undefined ? {} : { onSave })}
+            />
+          </figure>
+        )}
+      </div>
     </div>
   );
 }

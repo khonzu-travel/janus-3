@@ -34,7 +34,7 @@ import { menuTemplate } from './menu.js';
 import { ProjectController, appPreferences } from './project-controller.js';
 import { detectProject, lastProject, type Project } from './projects.js';
 import { RecentProjects } from './recent.js';
-import { appNavigation, atlasAddress, atlasNavigation, externalDecision } from './urls.js';
+import { appNavigation, atlasAddress, atlasNavigation, externalDecision, permissionAllowed } from './urls.js';
 import { clampBounds, DEFAULT_SIZE, MIN_SIZE, WindowStates } from './window-state.js';
 
 // The Electron main process: projects, windows, menus, the
@@ -111,10 +111,10 @@ async function run(): Promise<void> {
   // ---- Sessions and security ----
 
   const hardenSession = (target: Session): void => {
-    target.setPermissionRequestHandler((_contents, _permission, callback) => {
-      callback(false);
+    target.setPermissionRequestHandler((_contents, permission, callback) => {
+      callback(permissionAllowed(permission));
     });
-    target.setPermissionCheckHandler(() => false);
+    target.setPermissionCheckHandler((_contents, permission) => permissionAllowed(permission));
     target.on('will-download', (event) => {
       event.preventDefault();
     });

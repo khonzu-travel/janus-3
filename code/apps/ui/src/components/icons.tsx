@@ -276,3 +276,61 @@ export function HelpIcon(props: IconProps) {
     </Svg>
   );
 }
+
+export function ArrowUpIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 19V5" />
+      <path d="m5 12 7-7 7 7" />
+    </Svg>
+  );
+}
+
+export function ArrowDownIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 5v14" />
+      <path d="m19 12-7 7-7-7" />
+    </Svg>
+  );
+}
+
+export function CloseIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </Svg>
+  );
+}
+
+/** Replace one: an arrow from the found text down to its replacement. */
+export function ReplaceIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M14 4a2 2 0 0 1 2-2" />
+      <path d="M16 10a2 2 0 0 1-2-2" />
+      <path d="M20 2a2 2 0 0 1 2 2" />
+      <path d="M22 8a2 2 0 0 1-2 2" />
+      <path d="m3 7 3 3 3-3" />
+      <path d="M6 10V5a3 3 0 0 1 3-3h1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+    </Svg>
+  );
+}
+
+/** Replace all: as Replace, with a second replacement beside the first. */
+export function ReplaceAllIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M14 4a2 2 0 0 1 2-2" />
+      <path d="M16 10a2 2 0 0 1-2-2" />
+      <path d="M20 2a2 2 0 0 1 2 2" />
+      <path d="M22 8a2 2 0 0 1-2 2" />
+      <path d="m3 7 3 3 3-3" />
+      <path d="M6 10V5a3 3 0 0 1 3-3h1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </Svg>
+  );
+}
