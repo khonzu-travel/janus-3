@@ -18,10 +18,9 @@ import {
   type Panel,
   type ViewUpdate,
 } from '@codemirror/view';
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
-import { iconButtonClass } from '../../components/buttonClass.js';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -30,7 +29,7 @@ import {
   ReplaceAllIcon,
   ReplaceIcon,
 } from '../../components/icons.js';
-import { filterBoxClass } from '../../components/listRows.js';
+import { COUNT_LIMIT, countText, findInputClass, FindToggles, IconButton } from '../../components/findBarParts.js';
 
 /**
  * The find bar of a code editor, at its top. Ctrl/⌘ + F opens it and Ctrl + H
@@ -38,9 +37,6 @@ import { filterBoxClass } from '../../components/listRows.js';
  * ⌘ + Option + F too). Matches follow the typing; Enter goes to the next,
  * Shift + Enter to the previous, and Escape closes the bar and returns to the text.
  */
-
-/** Counting stops here, so a huge body with a one-letter search stays quick. */
-const COUNT_LIMIT = 1000;
 
 type Focus = 'search' | 'replace';
 
@@ -145,70 +141,6 @@ function countMatches(state: EditorState, query: SearchQuery): { readonly total:
   return { total, current };
 }
 
-function countText(query: SearchQuery, total: number, current: number): string {
-  if (query.search === '') return '';
-  if (!query.valid) return 'Invalid regex';
-  if (total === 0) return 'No results';
-  const all = total >= COUNT_LIMIT ? `${String(COUNT_LIMIT)}+` : String(total);
-  return current === 0 ? `${all} found` : `${String(current)} of ${all}`;
-}
-
-const inputClass = `${filterBoxClass} w-56 min-w-24 flex-1 font-mono text-mono text-fg aria-invalid:border-bad`;
-
-function Toggle({
-  label,
-  pressed,
-  onToggle,
-  children,
-}: {
-  readonly label: string;
-  readonly pressed: boolean;
-  readonly onToggle: () => void;
-  readonly children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      aria-pressed={pressed}
-      onClick={onToggle}
-      className={`inline-flex size-6 items-center justify-center rounded border font-mono text-label focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
-        pressed
-          ? 'border-fg bg-fg text-surface'
-          : 'border-line-strong bg-surface text-muted hover:bg-hover hover:text-fg'
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  disabled = false,
-  children,
-}: {
-  readonly label: string;
-  readonly onClick: () => void;
-  readonly disabled?: boolean;
-  readonly children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      className={`${iconButtonClass} disabled:opacity-50 disabled:hover:bg-surface disabled:hover:text-muted`}
-    >
-      {children}
-    </button>
-  );
-}
-
 function SearchBar({
   view,
   state,
@@ -299,7 +231,7 @@ function SearchBar({
           <input
             ref={searchField}
             type="text"
-            className={inputClass}
+            className={findInputClass}
             aria-label="Find"
             placeholder="Find"
             spellCheck={false}
@@ -312,35 +244,9 @@ function SearchBar({
               commit({ search: event.target.value });
             }}
           />
-          <Toggle
-            label="Match case"
-            pressed={spec.caseSensitive}
-            onToggle={() => {
-              commit({ caseSensitive: !spec.caseSensitive });
-            }}
-          >
-            Aa
-          </Toggle>
-          <Toggle
-            label="Match whole word"
-            pressed={spec.wholeWord}
-            onToggle={() => {
-              commit({ wholeWord: !spec.wholeWord });
-            }}
-          >
-            <span className="underline decoration-1 underline-offset-2">ab</span>
-          </Toggle>
-          <Toggle
-            label="Use regular expression"
-            pressed={spec.regexp}
-            onToggle={() => {
-              commit({ regexp: !spec.regexp });
-            }}
-          >
-            .*
-          </Toggle>
+          <FindToggles options={spec} onChange={commit} />
           <span className="min-w-20 px-1 text-label whitespace-nowrap text-muted" aria-live="polite">
-            {countText(query, total, current)}
+            {countText(query.search, query.valid, total, current)}
           </span>
           <IconButton label="Previous match (Shift + Enter)" disabled={total === 0} onClick={() => findPrevious(view)}>
             <ArrowUpIcon />
@@ -357,7 +263,7 @@ function SearchBar({
             <input
               ref={replaceField}
               type="text"
-              className={inputClass}
+              className={findInputClass}
               aria-label="Replace"
               placeholder="Replace"
               spellCheck={false}

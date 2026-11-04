@@ -1,9 +1,9 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Preview } from '../../atlas/wire.js';
-import { useSelectAllInBoxes } from '../../components/selectAll.js';
+import { useFindInBoxes, useSelectAllInBoxes } from '../../components/selectAll.js';
 import { BodyView } from './JsonTree.js';
 
 const text = (value: string, truncated = false): Preview => ({
@@ -216,5 +216,60 @@ describe('select all in a body inside a focusable panel', () => {
     const selected = window.getSelection()?.toString() ?? '';
     expect(selected).toContain('"a"');
     expect(selected).not.toContain('Outside the body');
+  });
+});
+
+describe('find in a body', () => {
+  function WithFind({ children }: { readonly children: React.ReactNode }) {
+    useFindInBoxes();
+    return children;
+  }
+
+  it('opens on Ctrl + F in the body, shows JSON as Text while open, steps through matches and closes on Escape', async () => {
+    const user = userEvent.setup();
+    render(
+      <WithFind>
+        <BodyView preview={text('{"name":"cat","pet":"Cat","other":"dog"}')} status={200} mediaType={null} />
+      </WithFind>,
+    );
+    screen.getByRole('button', { name: 'Line numbers' }).focus();
+    await user.keyboard('{Control>}f{/Control}');
+    const find = await screen.findByRole('textbox', { name: 'Find' });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(find);
+    });
+    // The tree's rows would hide collapsed matches; Text shows them all.
+    expect(screen.getByRole('button', { name: 'Text' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Tree' }).hasAttribute('disabled')).toBe(true);
+
+    await user.type(find, 'cat');
+    expect(screen.getByText('1 of 2')).toBeDefined();
+    await user.keyboard('{Enter}');
+    expect(screen.getByText('2 of 2')).toBeDefined();
+    await user.click(screen.getByRole('button', { name: 'Match case' }));
+    expect(screen.getByText('1 of 1')).toBeDefined();
+    await user.click(find);
+    await user.clear(find);
+    await user.type(find, '(');
+    await user.click(screen.getByRole('button', { name: 'Use regular expression' }));
+    expect(screen.getByText('Invalid regex')).toBeDefined();
+
+    await user.click(find);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('textbox', { name: 'Find' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Tree' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('leaves Ctrl + F to the browser outside a body', async () => {
+    const user = userEvent.setup();
+    render(
+      <WithFind>
+        <button type="button">Elsewhere</button>
+        <BodyView preview={text('{"a":1}')} status={200} mediaType={null} />
+      </WithFind>,
+    );
+    screen.getByRole('button', { name: 'Elsewhere' }).focus();
+    await user.keyboard('{Control>}f{/Control}');
+    expect(screen.queryByRole('textbox', { name: 'Find' })).toBeNull();
   });
 });

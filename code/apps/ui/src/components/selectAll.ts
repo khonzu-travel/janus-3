@@ -29,7 +29,7 @@ function boxOf(node: Node | null | undefined): Element | null {
  * focusable element holds it, such as a tab panel, or on the page), the one
  * holding the caret; else the only box inside the focused element.
  */
-function boxFor(focused: Element | null, caret: Node | null): Element | null {
+export function boxFor(focused: Element | null, caret: Node | null): Element | null {
   const holder = focused ?? document.body;
   const own = boxOf(holder);
   if (own !== null) return own;
@@ -51,6 +51,40 @@ export function useSelectAllInBoxes(): void {
       if (box === null || selection === null) return;
       event.preventDefault();
       selection.selectAllChildren(box.querySelector(CONTENT) ?? box);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
+}
+
+/** The event a body box gets on Ctrl/⌘ + F; `detail` is the selected text, to search for, or ''. */
+export const FIND_IN_BOX = 'janus:find';
+
+/** Ctrl/⌘ + F, on any keyboard layout. */
+function isFind(event: KeyboardEvent): boolean {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return false;
+  const key = event.key.toLowerCase();
+  return key === 'f' || (!/^[a-z]$/.test(key) && event.code === 'KeyF');
+}
+
+/**
+ * Ctrl/⌘ + F with focus or the caret in a body box opens that box's find
+ * bar instead of the browser's. A code editor handles the keys itself first.
+ */
+export function useFindInBoxes(): void {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented || !isFind(event) || typing(event.target)) return;
+      const selection = window.getSelection();
+      const box = boxFor(document.activeElement, selection?.anchorNode ?? null);
+      if (box === null) return;
+      event.preventDefault();
+      const selected = selection === null || !box.contains(selection.anchorNode) ? '' : selection.toString();
+      // Only a short, single-line selection is something to search for.
+      const search = selected.length > 0 && selected.length < 100 && !selected.includes('\n') ? selected : '';
+      box.dispatchEvent(new CustomEvent(FIND_IN_BOX, { detail: search }));
     };
     document.addEventListener('keydown', onKey);
     return () => {

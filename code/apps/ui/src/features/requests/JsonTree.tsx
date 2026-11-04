@@ -1,8 +1,10 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 import type { Preview } from '../../atlas/wire.js';
+import { BoxFind } from '../../components/BoxFind.js';
 import { iconButtonClass } from '../../components/buttonClass.js';
 import { ChevronRightIcon, LineNumbersIcon } from '../../components/icons.js';
+import { FIND_IN_BOX } from '../../components/selectAll.js';
 import { BodyPreview, type Mark } from '../fixtures/Preview.js';
 import { formatBytes } from '../fixtures/format.js';
 import { copyLabel, CopyButton } from './CopyButton.js';
@@ -65,6 +67,23 @@ export function BodyView({
   const [chosen, setView] = useState<'tree' | 'text' | null>(null);
   const view = chosen ?? (asText || (marks !== undefined && marks.length > 0) ? 'text' : 'tree');
   const [lineNumbers, setLineNumbers] = useLineNumbers();
+  // Ctrl/⌘ + F in the box opens its find bar; each press refocuses it.
+  const box = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const [find, setFind] = useState<{ readonly turn: number; readonly search: string } | null>(null);
+  const available = preview.state === 'available' && preview.byteLength > 0;
+  useEffect(() => {
+    const element = box.current;
+    if (element === null) return;
+    const onFind = (event: Event): void => {
+      const search = event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : '';
+      setFind((open) => ({ turn: (open?.turn ?? 0) + 1, search }));
+    };
+    element.addEventListener(FIND_IN_BOX, onFind);
+    return () => {
+      element.removeEventListener(FIND_IN_BOX, onFind);
+    };
+  }, [available]);
   const text = (
     <BodyPreview
       preview={preview}
@@ -75,7 +94,7 @@ export function BodyView({
     />
   );
   // Nothing to number in a missing or empty body.
-  if (preview.state !== 'available' || preview.byteLength === 0) return text;
+  if (!available) return text;
   const numbers = (
     <button
       type="button"
@@ -90,37 +109,60 @@ export function BodyView({
       <LineNumbersIcon className="size-3.5" />
     </button>
   );
+  // While finding, a JSON body shows as Text, so rows the tree has collapsed are searched too.
+  const shown = find === null ? view : 'text';
+  const tools = (
+    <div className="flex items-center gap-1.5">
+      {/* The body exactly as it came, not as the tree or the text view lays it out. */}
+      {json === null ? null : <CopyButton label={copyLabel(name ?? 'Body')} text={() => preview.value} />}
+      {numbers}
+      {json === null ? null : (
+        <div
+          role="group"
+          aria-label="Body format"
+          className="inline-flex overflow-hidden rounded border border-line-strong bg-surface"
+        >
+          {(['tree', 'text'] as const).map((option, index) => (
+            <button
+              key={option}
+              type="button"
+              className={`${segmentClass} ${index === 0 ? '' : 'border-l border-line-strong'} disabled:opacity-50`}
+              aria-pressed={shown === option}
+              disabled={find !== null && option === 'tree'}
+              title={find !== null && option === 'tree' ? 'Close Find to see the tree' : undefined}
+              onClick={() => {
+                setView(option);
+                setAsText(option === 'text');
+              }}
+            >
+              {option === 'tree' ? 'Tree' : 'Text'}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
   return (
-    <div className="relative" data-select-all-box="">
-      <div className="absolute top-1.5 right-4 z-10 flex items-center gap-1.5">
-        {/* The body exactly as it came, not as the tree or the text view lays it out. */}
-        {json === null ? null : <CopyButton label={copyLabel(name ?? 'Body')} text={() => preview.value} />}
-        {numbers}
-        {json === null ? null : (
-          <div
-            role="group"
-            aria-label="Body format"
-            className="inline-flex overflow-hidden rounded border border-line-strong bg-surface"
-          >
-            {(['tree', 'text'] as const).map((option, index) => (
-              <button
-                key={option}
-                type="button"
-                className={`${segmentClass} ${index === 0 ? '' : 'border-l border-line-strong'}`}
-                aria-pressed={view === option}
-                onClick={() => {
-                  setView(option);
-                  setAsText(option === 'text');
-                }}
-              >
-                {option === 'tree' ? 'Tree' : 'Text'}
-              </button>
-            ))}
+    <div ref={box} className="relative" data-select-all-box="">
+      {find === null ? (
+        <div className="absolute top-1.5 right-4 z-10">{tools}</div>
+      ) : (
+        // The find bar and the body's buttons share a row that stays in view while the body scrolls.
+        <div className="sticky top-0 z-20 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 border-b border-line bg-bg py-1 pr-4 pl-2">
+          <div className="min-w-0 flex-1">
+            <BoxFind
+              content={content}
+              open={find}
+              onClose={() => {
+                setFind(null);
+              }}
+            />
           </div>
-        )}
-      </div>
-      <div data-select-all-content="">
-        {json === null || view === 'text' ? (
+          {tools}
+        </div>
+      )}
+      <div ref={content} data-select-all-content="">
+        {json === null || shown === 'text' ? (
           text
         ) : (
           <figure>

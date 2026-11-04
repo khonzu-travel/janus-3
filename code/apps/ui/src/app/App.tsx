@@ -4,7 +4,7 @@ import { RouterProvider } from 'react-router';
 
 import type { AtlasClient } from '../atlas/client.js';
 import type { EventSourceFactory } from '../atlas/events.js';
-import { useSelectAllInBoxes } from '../components/selectAll.js';
+import { useFindInBoxes, useSelectAllInBoxes } from '../components/selectAll.js';
 import { AtlasProvider } from '../hooks/AtlasProvider.js';
 import { nativeEventSource } from '../hooks/SnapshotFeed.js';
 import { createQueryClient } from './createQueryClient.js';
@@ -21,6 +21,7 @@ export function App({
   const [queryClient] = useState(createQueryClient);
   const [router] = useState(createRouter);
   useSelectAllInBoxes();
+  useFindInBoxes();
   return (
     <QueryClientProvider client={queryClient}>
       <AtlasProvider client={client} eventSource={eventSource}>

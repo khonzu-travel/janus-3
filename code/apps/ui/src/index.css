@@ -334,3 +334,12 @@ button {
     outline-offset: 1px;
   }
 }
+
+/* Matches of a body's find bar (the CSS Custom Highlight API), the current one apart. */
+::highlight(janus-find) {
+  background-color: var(--warn-soft);
+}
+::highlight(janus-find-current) {
+  background-color: var(--warn);
+  color: var(--surface);
+}
