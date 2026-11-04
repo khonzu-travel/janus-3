@@ -193,6 +193,12 @@ test('imports a Postman collection, saves a value as a variable, and runs it in 
   await expect(inspector.getByRole('list', { name: 'Decisions' })).toContainText('Matched');
   const body = response.getByRole('list', { name: 'Response body (JSON tree)' });
   await expect(body.getByRole('button', { name: 'Collapse $' })).toHaveAttribute('aria-expanded', 'true');
+  // Ctrl/⌘ + A after a click in the body selects the body, not the page.
+  await body.getByText('"id"').click();
+  await page.keyboard.press('ControlOrMeta+a');
+  const selected: string = await page.evaluate('String(window.getSelection())');
+  expect(selected).toContain('"c-mock"');
+  expect(selected).not.toContain('Collections');
   await body.getByText('"id"').hover();
   await response.getByRole('button', { name: 'Save $.id as variable' }).click();
   await expect(

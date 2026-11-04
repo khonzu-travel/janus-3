@@ -23,15 +23,31 @@ function boxOf(node: Node | null | undefined): Element | null {
   return element?.closest(BOX) ?? null;
 }
 
+/**
+ * The box Ctrl/⌘ + A selects in: the one holding focus; else, when the caret
+ * lies in the focused element (a click in the text leaves focus on whatever
+ * focusable element holds it, such as a tab panel, or on the page), the one
+ * holding the caret; else the only box inside the focused element.
+ */
+function boxFor(focused: Element | null, caret: Node | null): Element | null {
+  const holder = focused ?? document.body;
+  const own = boxOf(holder);
+  if (own !== null) return own;
+  if (caret !== null && holder.contains(caret)) {
+    const atCaret = boxOf(caret);
+    if (atCaret !== null) return atCaret;
+  }
+  const inside = holder === document.body ? [] : holder.querySelectorAll(BOX);
+  return inside.length === 1 ? (inside[0] ?? null) : null;
+}
+
 /** Installs the Ctrl/⌘ + A handling for every body box on the page. */
 export function useSelectAllInBoxes(): void {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.defaultPrevented || !isSelectAll(event) || typing(event.target)) return;
       const selection = window.getSelection();
-      const focused = document.activeElement;
-      // With nothing focused, a click in the text leaves only the caret to say where you are.
-      const box = focused !== null && focused !== document.body ? boxOf(focused) : boxOf(selection?.anchorNode ?? null);
+      const box = boxFor(document.activeElement, selection?.anchorNode ?? null);
       if (box === null || selection === null) return;
       event.preventDefault();
       selection.selectAllChildren(box.querySelector(CONTENT) ?? box);

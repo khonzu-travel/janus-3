@@ -188,3 +188,33 @@ describe('select all in a body', () => {
     await user.keyboard('{Escape}');
   });
 });
+
+describe('select all in a body inside a focusable panel', () => {
+  function Panel({ children }: { readonly children: React.ReactNode }) {
+    useSelectAllInBoxes();
+    return (
+      <>
+        <p>Outside the body</p>
+        {/* As the Requests result tabs: a click in the body leaves focus on the panel. */}
+        <div role="tabpanel" tabIndex={0} aria-label="Body">
+          {children}
+        </div>
+      </>
+    );
+  }
+
+  it('selects only the body when the panel holds focus and the caret is in the text', async () => {
+    const user = userEvent.setup();
+    render(
+      <Panel>
+        <BodyView name="Response body" preview={text('{"a":1}')} status={200} mediaType={null} />
+      </Panel>,
+    );
+    screen.getByRole('tabpanel').focus();
+    window.getSelection()?.collapse(screen.getByText('JSON', { exact: false }).firstChild, 0);
+    await user.keyboard('{Control>}a{/Control}');
+    const selected = window.getSelection()?.toString() ?? '';
+    expect(selected).toContain('"a"');
+    expect(selected).not.toContain('Outside the body');
+  });
+});
